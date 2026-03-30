@@ -1,0 +1,1503 @@
+{
+  "timestamp": "2026-03-07T01:03:14.355279",
+  "eval_dates_weekday": [
+    "2011-07-11",
+    "2011-07-12"
+  ],
+  "eval_dates_weekend": [
+    "2011-07-10",
+    "2011-07-17"
+  ],
+  "num_episodes_per_scenario": 10,
+  "num_runs": 1,
+  "scenarios": [
+    "sunny",
+    "cloudy",
+    "normal",
+    "heterogeneous"
+  ],
+  "results": [
+    {
+      "scenario": "sunny",
+      "pv_coef": 6.0,
+      "weekday": {
+        "mean_peak_load": 33.439,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 27.20335917250635,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          2.091430793138767,
+          17.52637309771689,
+          7.585555281650693
+        ],
+        "mean_cost_std": 6.459282231580728,
+        "mean_agent_community_charge": [
+          48.464681440443215,
+          89.46468144044323,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          19.96175,
+          0.0,
+          115.92350000000002
+        ],
+        "mean_agent_credit_change": [
+          0.46040534490868074,
+          46.15644498033886,
+          -60.17803762441906
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 34.422,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 17.474188503174215,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          -1.6261363406759712,
+          20.085652407121547,
+          -0.9853275632713645
+        ],
+        "mean_cost_std": 10.116934263390865,
+        "mean_agent_community_charge": [
+          47.13538781163436,
+          91.88538781163436,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          21.379999999999995,
+          0.0,
+          115.51000000000002
+        ],
+        "mean_agent_credit_change": [
+          -1.3803523674544538,
+          47.58153619082867,
+          -60.15555341480842
+        ]
+      }
+    },
+    {
+      "scenario": "cloudy",
+      "pv_coef": 2.0,
+      "weekday": {
+        "mean_peak_load": 33.339,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 44.97169342293826,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          8.13379223061998,
+          23.769255286410694,
+          13.068645905907582
+        ],
+        "mean_cost_std": 6.548613225904807,
+        "mean_agent_community_charge": [
+          47.19113573407203,
+          89.44113573407205,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          20.56495833333333,
+          0.0,
+          114.12991666666667
+        ],
+        "mean_agent_credit_change": [
+          -0.22368724841539392,
+          46.603402449082694,
+          -59.96767787156104
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 34.272,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 30.352105169098234,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          2.2080192870432707,
+          24.449883743080388,
+          3.694202138974582
+        ],
+        "mean_cost_std": 10.207496223977625,
+        "mean_agent_community_charge": [
+          46.996883656509695,
+          91.49688365650971,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          21.138124999999995,
+          0.0,
+          115.27625
+        ],
+        "mean_agent_credit_change": [
+          -1.3157111567744042,
+          47.530590895241296,
+          -60.30754292358218
+        ]
+      }
+    },
+    {
+      "scenario": "normal",
+      "pv_coef": 4.0,
+      "weekday": {
+        "mean_peak_load": 33.689,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 35.48969315724568,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          5.100556904682433,
+          20.30292305659869,
+          10.086213195964556
+        ],
+        "mean_cost_std": 6.362161219977347,
+        "mean_agent_community_charge": [
+          48.077908587257625,
+          89.57790858725764,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          20.282958333333333,
+          0.0,
+          115.31591666666665
+        ],
+        "mean_agent_credit_change": [
+          0.2627518708043623,
+          46.36629152789432,
+          -60.10425166154839
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 34.321999999999996,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 23.739704755198687,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          0.3710517737450153,
+          22.32518766527591,
+          1.0434653161777578
+        ],
+        "mean_cost_std": 10.228048515596907,
+        "mean_agent_community_charge": [
+          46.88538781163435,
+          91.38538781163436,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          21.071041666666662,
+          0.0,
+          115.14208333333333
+        ],
+        "mean_agent_credit_change": [
+          -1.391753192179221,
+          47.46223931617832,
+          -60.219495479200404
+        ]
+      }
+    },
+    {
+      "scenario": "heterogeneous",
+      "pv_coef": 4.0,
+      "weekday": {
+        "mean_peak_load": 33.789,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 34.425948183811,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          2.1363861824762136,
+          20.242603414765362,
+          12.046958586569435
+        ],
+        "mean_cost_std": 7.428629126227061,
+        "mean_agent_community_charge": [
+          47.799168975069264,
+          89.29916897506926,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          20.198583333333332,
+          0.0,
+          114.89716666666666
+        ],
+        "mean_agent_credit_change": [
+          0.18186522244974002,
+          46.28715480663956,
+          -60.014696632715115
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 34.122,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 23.406097930496177,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          -1.7358356265761217,
+          22.052626688663487,
+          3.0893068684088045
+        ],
+        "mean_cost_std": 10.483170083908007,
+        "mean_agent_community_charge": [
+          46.91412742382272,
+          91.41412742382273,
+          0.0
+        ],
+        "mean_agent_community_discharge": [
+          21.08833333333333,
+          0.0,
+          115.17666666666669
+        ],
+        "mean_agent_credit_change": [
+          -1.372111176307423,
+          47.46011752819532,
+          -60.21488790099687
+        ]
+      },
+      "one_episode_agent_pv_flows": [
+        [
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.07200000000000001,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.156,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.6000000000000001,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.1280000000000001,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.6560000000000001,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.1719999999999997,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.4365884561261346,
+            "ess_charge": 0.26341154387386556,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 3.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.2279999999999998,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 1.0720000000000005,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.532,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 1.9240000000000004,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.388,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 1.2839999999999998,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.294,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 1.3059999999999996,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.97,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 1.6299999999999997,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.922,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 1.6059999999999997,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.964,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 1.2639999999999998,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.024,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.976,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.324,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 1.148
+          },
+          {
+            "direct_use": 1.1079999999999999,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.8480000000000001
+          },
+          {
+            "direct_use": 0.972,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          }
+        ],
+        [
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.048,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.104,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.4,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.752,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.104,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.448,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.796,
+            "ess_charge": 1.004,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.226,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.774,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.428,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.7720000000000002,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.032,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.27200000000000024,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.888,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.56,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.294,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.10599999999999987,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.4,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.422,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.9299999999999999,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.964,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.18799999999999972,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 2.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.324,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.32399999999999984,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.304,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.648,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          }
+        ],
+        [
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.024,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.052,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.2,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.376,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.552,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.724,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.796,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.10399999999999998
+          },
+          {
+            "direct_use": 1.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.1,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.1520000000000001,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.224,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.2,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.2,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.176,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.0759999999999998,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 1.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.824,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.652,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.324,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          },
+          {
+            "direct_use": 0.0,
+            "ess_charge": 0.0,
+            "ev_charge": 0.0,
+            "community_charge": 0.0,
+            "grid_sell": 0.0
+          }
+        ]
+      ]
+    }
+  ],
+  "results_independent": [
+    {
+      "scenario": "sunny",
+      "pv_coef": 6.0,
+      "weekday": {
+        "mean_peak_load": 58.51099999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 13.102459705580799,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          4.184270306091632,
+          6.565066449384328,
+          2.353122950104841
+        ],
+        "mean_cost_std": 2.56830578959602,
+        "mean_agent_community_charge": [
+          6.0631578947368405,
+          6.0631578947368405,
+          3.0315789473684203
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.3672035020833333,
+          1.3672035020833333,
+          0.6836017510416666
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 58.63399999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 10.188025060000268,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          3.276131191448158,
+          6.113154432535116,
+          0.7987394360169929
+        ],
+        "mean_cost_std": 2.472458708594729,
+        "mean_agent_community_charge": [
+          6.0631578947368405,
+          6.0631578947368405,
+          3.0315789473684203
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.3672035020833333,
+          1.3672035020833333,
+          0.6836017510416666
+        ]
+      }
+    },
+    {
+      "scenario": "cloudy",
+      "pv_coef": 2.0,
+      "weekday": {
+        "mean_peak_load": 58.51099999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 40.62441847930683,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          12.26620163981833,
+          16.116044700222222,
+          12.24217213926628
+        ],
+        "mean_cost_std": 2.458086654632548,
+        "mean_agent_community_charge": [
+          6.0631578947368405,
+          6.0631578947368405,
+          3.0315789473684203
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.3672035020833333,
+          1.3672035020833333,
+          0.6836017510416666
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 58.63399999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 28.28953457699838,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          9.601748453278562,
+          13.452422248047338,
+          5.235363875672483
+        ],
+        "mean_cost_std": 3.938912876727246,
+        "mean_agent_community_charge": [
+          6.0631578947368405,
+          6.0631578947368405,
+          3.0315789473684203
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.3672035020833333,
+          1.3672035020833333,
+          0.6836017510416666
+        ]
+      }
+    },
+    {
+      "scenario": "normal",
+      "pv_coef": 4.0,
+      "weekday": {
+        "mean_peak_load": 58.51099999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 26.126829177163938,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          7.6015754423707005,
+          12.602688876593234,
+          5.9225648582000066
+        ],
+        "mean_cost_std": 3.4119173051151592,
+        "mean_agent_community_charge": [
+          6.1185595567867015,
+          6.1185595567867015,
+          3.0592797783933507
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.125,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.379308908908818,
+          1.3488363277684672,
+          0.689654454454409
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 58.63399999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 19.657151233055778,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          5.340666432438683,
+          11.387910034871847,
+          2.928574765745247
+        ],
+        "mean_cost_std": 3.743615290567804,
+        "mean_agent_community_charge": [
+          6.0631578947368405,
+          6.0631578947368405,
+          3.0315789473684203
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.3672035020833333,
+          1.3672035020833333,
+          0.6836017510416666
+        ]
+      }
+    },
+    {
+      "scenario": "heterogeneous",
+      "pv_coef": 4.0,
+      "weekday": {
+        "mean_peak_load": 58.51099999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 28.347379905885123,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          3.7721939747956386,
+          12.730368027637276,
+          11.844817903452206
+        ],
+        "mean_cost_std": 4.308742321455356,
+        "mean_agent_community_charge": [
+          6.0631578947368405,
+          6.0631578947368405,
+          3.0315789473684203
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.3672035020833333,
+          1.3672035020833333,
+          0.6836017510416666
+        ]
+      },
+      "weekend": {
+        "mean_peak_load": 58.63399999999999,
+        "std_peak_load": 0.0,
+        "mean_total_cost": 20.578035923742966,
+        "std_total_cost": 0.0,
+        "mean_agent_costs": [
+          4.412626277706752,
+          10.046304335938778,
+          6.119105310097435
+        ],
+        "mean_cost_std": 3.1697204896734674,
+        "mean_agent_community_charge": [
+          6.132409972299167,
+          6.097783933518004,
+          3.0662049861495837
+        ],
+        "mean_agent_community_discharge": [
+          0.0,
+          0.125,
+          0.0
+        ],
+        "mean_agent_credit_change": [
+          1.4046116112938596,
+          1.355962037801533,
+          0.7023058056469298
+        ]
+      }
+    }
+  ]
+}
