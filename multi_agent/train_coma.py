@@ -2,12 +2,16 @@
 COMA 训练脚本：与 MAPPO 相同的环境与 episode 数，训练结束后保存模型与 training_stats.json、CSV。
 不周期性保存模型，仅结束时保存一次。
 """
+
 import sys
 import os
 import json
 import argparse
 import numpy as np
 from datetime import datetime
+import torch
+import os
+os.environ["TORCHDYNAMO_DISABLE"] = "1"
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
@@ -28,6 +32,9 @@ def load_config(config_path='multi_agent/config.json'):
 
 def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algorithms/models_coma',
                load_model=None, config_path='multi_agent/config.json', n_episodes_per_update=2):
+    # 强制每更新一次只用一个 episode（更稳定）
+    n_episodes_per_update = 1
+
     config = load_config(config_path)
     if baseline_peak is None:
         baseline_peak = config.get('baseline_peak', 31.01)
@@ -43,18 +50,28 @@ def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algo
     print("Training COMA Algorithm")
     print("=" * 60)
     print(f"Episodes: {num_episodes}, Baseline peak: {baseline_peak} kW, Save dir: {save_dir}")
-    # COMA 超参数：只在此处修改，不读 config（Actor 不归一化、仅 Critic 归一化）
-    lr_actor = 5e-4
-    lr_critic = 2e-4
-    ent_coef = 0.01  # 熵项
-    use_popart = True
-    use_actor_state_normalization = False   # Actor
-    use_critic_state_normalization = False   #  Critic 输入归一化
-    use_advantage_normalization = False
-    reward_scale = 1.0  # 不缩放奖励
+
+    # 超参数（已调稳）
+    lr_actor = 1e-5
+    lr_critic = 5e-6
+    use_popart = False
+    use_advantage_normalization = True
+    max_grad_norm = 1.0
+    td_target_clip = 20.0
+    ent_coef = 0.005
+    use_actor_state_normalization = False
+    use_critic_state_normalization = True
+    reward_scale = 1.0
     n_actor_epochs = 1
-    td_target_clip = 500.0
-    print(f"n_episodes_per_update: {n_episodes_per_update}, use_popart: {use_popart}, actor_state_norm: {use_actor_state_normalization}, critic_state_norm: {use_critic_state_normalization}, use_adv_norm: {use_advantage_normalization}, reward_scale: {reward_scale}, ent_coef: {ent_coef}, lr_actor: {lr_actor}, lr_critic: {lr_critic}, n_actor_epochs: {n_actor_epochs}, td_target_clip: {td_target_clip}")
+    print(f"n_episodes_per_update: {n_episodes_per_update}, use_popart: {use_popart}, "
+          f"actor_state_norm: {use_actor_state_normalization}, critic_state_norm: {use_critic_state_normalization}, "
+          f"use_adv_norm: {use_advantage_normalization}, reward_scale: {reward_scale}, ent_coef: {ent_coef}, "
+          f"lr_actor: {lr_actor}, lr_critic: {lr_critic}, n_actor_epochs: {n_actor_epochs}, "
+          f"td_target_clip: {td_target_clip}")
+
+    # 定义训练和测试住户（15 户训练，5 户测试）
+    train_house_ids = [f"H{i}" for i in range(1, 16)]
+    test_house_ids = [f"H{i}" for i in range(16, 21)]
 
     env = MultiAgentHEMEnv(
         n_agents=3,
@@ -68,23 +85,25 @@ def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algo
         peak_discharge_bonus=peak_discharge_bonus,
         peak_credit_cost_reduction=peak_credit_cost_reduction,
         pv_coefficients=[2.0, 2.0, 2.0],
+        train_house_ids=train_house_ids,
+        test_house_ids=test_house_ids,
     )
 
     training_dates = [
-        '2011-07-03', '2011-07-04', '2011-07-05', '2011-07-06',
-        '2011-07-07', '2011-07-08', '2011-07-09',
+        '2020-01-01', '2020-01-02', '2020-01-03', '2020-01-04',
+        '2020-01-05', '2020-01-06', '2020-01-07',
     ]
     sunny_coef = MultiAgentDataInterface.get_weather_coefficient('sunny')
     cloudy_coef = MultiAgentDataInterface.get_weather_coefficient('cloudy')
-    pv_list = [
-        [sunny_coef, sunny_coef, sunny_coef],
-    ] * 4 + [[cloudy_coef, cloudy_coef, cloudy_coef]] * 3
+    pv_list = [[sunny_coef, sunny_coef, sunny_coef]] * 4 + [[cloudy_coef, cloudy_coef, cloudy_coef]] * 3
     env.set_training_dates(training_dates, pv_list)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     coma = COMA(
         env=env,
         n_agents=3,
-        hidden_dim=128,
+        device=device,
+        hidden_dim=64,          # 降低隐藏层维度，减少计算量
         gamma=0.96,
         lr_actor=lr_actor,
         lr_critic=lr_critic,
@@ -92,13 +111,14 @@ def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algo
         use_critic_state_normalization=use_critic_state_normalization,
         reward_scale=reward_scale,
         use_reward_normalization=False,
-        max_grad_norm=10.0,
+        max_grad_norm=max_grad_norm,
         td_target_clip=td_target_clip,
         ent_coef=ent_coef,
         n_actor_epochs=n_actor_epochs,
         use_popart=use_popart,
         use_advantage_normalization=use_advantage_normalization,
     )
+
     if load_model and os.path.exists(load_model):
         coma.load(load_model)
         print(f"Loaded model from {load_model}")
@@ -111,16 +131,46 @@ def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algo
         'actor_loss': [],
         'critic_loss': [],
     }
-    num_dates = len(training_dates)
-    n_episodes_per_update = max(1, int(n_episodes_per_update))
     last_update_stats = None
 
-    for episode in range(num_episodes):
+    # 创建 checkpoint 目录
+    checkpoint_dir = os.path.join(save_dir, 'checkpoints')
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # ===== 新增：自动加载最新的 checkpoint =====
+    start_episode = 0
+    if load_model is None:
+        checkpoints = [f for f in os.listdir(checkpoint_dir) if f.startswith('checkpoint_') and f.endswith('.pt')]
+        if checkpoints:
+            # 按 episode 数字排序
+            checkpoints.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+            latest = checkpoints[-1]
+            checkpoint_path = os.path.join(checkpoint_dir, latest)
+            print(f"Loading checkpoint from {checkpoint_path}")
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+            coma.load_state_dict(checkpoint['model_state_dict'])
+            start_episode = checkpoint['episode'] + 1
+            training_stats = checkpoint['training_stats']
+            last_update_stats = checkpoint.get('last_update_stats')
+            print(f"Resumed from episode {start_episode}")
+    else:
+        if os.path.exists(load_model):
+            coma.load(load_model)
+            print(f"Loaded model from {load_model}")
+    # ===== 新增结束 =====
+
+    for episode in range(start_episode, num_episodes):
+    # # 创建 checkpoint 目录
+    # checkpoint_dir = os.path.join(save_dir, 'checkpoints')
+    # os.makedirs(checkpoint_dir, exist_ok=True)
+    #
+    # for episode in range(num_episodes):
         if episode % n_episodes_per_update == 0:
             coma.reset_buffer()
 
-        date_index = episode % num_dates
-        states = env.reset(mode='train', date_index=date_index)
+        date_index = episode % len(training_dates)
+        house_index = episode % len(train_house_ids)
+        states = env.reset(mode='train', date_index=date_index, house_index=house_index)
         global_state = get_global_state_vector(env)
 
         episode_return = 0.0
@@ -153,8 +203,8 @@ def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algo
         training_stats['episode_costs'].append(episode_cost)
         training_stats['peak_loads'].append(episode_peak_load)
 
-        # 每 n_episodes_per_update 个 episode 更新一次（或最后一轮若 buffer 非空也更新）
-        do_update = (episode + 1) % n_episodes_per_update == 0 or (episode == num_episodes - 1 and len(coma.buffer['rewards']) > 0)
+        do_update = (episode + 1) % n_episodes_per_update == 0 or \
+                    (episode == num_episodes - 1 and len(coma.buffer['rewards']) > 0)
         if do_update:
             update_stats = coma.update()
             last_update_stats = update_stats
@@ -162,7 +212,16 @@ def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algo
                 training_stats['actor_loss'].append(update_stats.get('actor_loss', 0))
                 training_stats['critic_loss'].append(update_stats.get('critic_loss', 0))
 
+        # 每 10 集保存一次 checkpoint 并打印进度
         if (episode + 1) % 10 == 0:
+            checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_{episode}.pt')
+            torch.save({
+                'episode': episode,
+                'model_state_dict': coma.state_dict(),
+                'training_stats': training_stats,
+                'last_update_stats': last_update_stats,
+            }, checkpoint_path)
+            # 打印训练进度
             w = min(10, len(training_stats['episode_returns']))
             avg_r = np.mean(training_stats['episode_returns'][-w:])
             avg_c = np.mean(training_stats['episode_costs'][-w:])
@@ -176,6 +235,7 @@ def train_coma(num_episodes=1000, baseline_peak=None, save_dir='multi_agent/algo
                   f"Cost: {episode_cost:.2f} | Peak: {episode_peak_load:.2f} kW | "
                   f"actor_loss: {al_str} | critic_loss: {cl_str}")
 
+    # 最终保存模型和统计
     coma.save(save_dir)
     print(f"Model saved to {save_dir}")
 

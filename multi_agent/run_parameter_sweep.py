@@ -22,10 +22,23 @@ from multi_agent.algorithms.mappo import MAPPO
 
 # ---------- 默认参数网格 ----------
 DEFAULT_INITIAL_SOC = [0.0, 0.3, 0.5, 0.7, 1.0]
-DEFAULT_INITIAL_CREDIT = [10.0, 20.0, 30.0, 40.0, 50.0,60.0, 70.0, 80.0, 90.0, 100.0]
+DEFAULT_INITIAL_CREDIT = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
 DEFAULT_NUM_EPISODES = 3
-EVAL_DATES = ['2011-07-10', '2011-07-11', '2011-07-12']
-PV_COEFFICIENTS_LIST = [[6.0, 6.0, 6.0], [2.0, 2.0, 2.0], [4.0, 4.0, 4.0]]
+
+# 评估日期使用 2020 年 StoreNet 数据（不与训练日期 01-01~01-07 重叠）
+EVAL_DATES = [
+    '2020-01-08',  # 周三（工作日）
+    '2020-01-09',  # 周四（工作日）
+    '2020-01-11',  # 周六（双休日）
+    '2020-01-12',  # 周日（双休日）
+]
+# 光伏系数列表长度必须与 EVAL_DATES 一致，每个日期对应一组 [agent1, agent2, agent3]
+PV_COEFFICIENTS_LIST = [
+    [3.0, 3.0, 3.0],  # 2020-01-08
+    [1.0, 1.0, 1.0],  # 2020-01-09
+    [3.0, 3.0, 3.0],  # 2020-01-11
+    [2.0, 2.0, 2.0],  # 2020-01-12
+]
 
 
 def load_env_config(config_path='multi_agent/config.json'):
@@ -59,7 +72,9 @@ def run_one_episode_mappo(env, mappo, initial_soc, initial_credit, date_index):
     在给定 initial_soc、initial_credit 下跑一个 episode（MAPPO），返回该 episode 的指标。
     """
     env.credit_system.initial_credit = initial_credit
-    states = env.reset(mode='eval', date_index=date_index, initial_community_soc=initial_soc)
+    # 关键修改：显式指定 house_index=0，使用训练住户 H1（确保数据存在）
+    states = env.reset(mode='eval', date_index=date_index,
+                       initial_community_soc=initial_soc, house_index=0)
     episode_cost = 0.0
     episode_agent_costs = [0.0, 0.0, 0.0]
     community_net_loads = []
@@ -102,6 +117,11 @@ def run_sweep_mappo(initial_soc_list, initial_credit_list, num_episodes, baselin
                     mappo_model_dir, config_path, output_dir, output_prefix):
     """对 MAPPO 做参数扫描。"""
     cfg = load_env_config(config_path)
+
+    # 显式指定住户列表，避免默认测试住户 H16 缺失
+    train_house_ids = [f"H{i}" for i in range(1, 16)]   # H1~H15
+    test_house_ids = [f"H{i}" for i in range(16, 21)]   # H16~H20
+
     env = MultiAgentHEMEnv(
         n_agents=3,
         community_ess_capacity=36.0,
@@ -114,8 +134,11 @@ def run_sweep_mappo(initial_soc_list, initial_credit_list, num_episodes, baselin
         peak_discharge_bonus=cfg['peak_discharge_bonus'],
         peak_credit_cost_reduction=cfg['peak_credit_cost_reduction'],
         pv_coefficients=[2.0, 2.0, 2.0],
+        train_house_ids=train_house_ids,
+        test_house_ids=test_house_ids,
     )
     env.set_evaluation_dates(EVAL_DATES, PV_COEFFICIENTS_LIST)
+
     mappo = MAPPO(
         env=env,
         n_agents=3,
@@ -133,6 +156,7 @@ def run_sweep_mappo(initial_soc_list, initial_credit_list, num_episodes, baselin
         reward_scale=10.0,
     )
     mappo.load(mappo_model_dir)
+
     results = []
     total_combos = len(initial_soc_list) * len(initial_credit_list)
     idx = 0
@@ -184,7 +208,7 @@ def save_results(method, results, initial_soc_list, initial_credit_list, num_epi
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(out, f, indent=2, ensure_ascii=False)
     print(f"已保存 JSON: {json_path}")
-    # CSV: 每行 = 一个参数组合的汇总（或每行一个 episode，这里用汇总）
+    # CSV: 每行 = 一个参数组合的汇总
     csv_path = os.path.join(output_dir, f'{prefix}_{method}.csv')
     with open(csv_path, 'w', encoding='utf-8') as f:
         f.write("initial_soc,initial_credit,mean_peak_load,std_peak_load,mean_total_cost,std_total_cost,"
@@ -196,7 +220,7 @@ def save_results(method, results, initial_soc_list, initial_credit_list, num_epi
                     f"{r['mean_total_cost']:.4f},{r['std_total_cost']:.4f},"
                     f"{mc[0]:.4f},{mc[1]:.4f},{mc[2]:.4f},{r.get('mean_cost_std', 0):.4f}\n")
     print(f"已保存 CSV: {csv_path}")
-    # 可选：再写一个“每 episode 一行”的 CSV，便于画散点或箱线
+    # 每 episode 一行 CSV，便于画散点或箱线
     csv_ep_path = os.path.join(output_dir, f'{prefix}_{method}_episodes.csv')
     with open(csv_ep_path, 'w', encoding='utf-8') as f:
         f.write("initial_soc,initial_credit,episode_id,peak_load,total_cost,agent1_cost,agent2_cost,agent3_cost,cost_std\n")

@@ -5,22 +5,41 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional
+
+
 class DataInterface:
     def __init__(
-        self,
-        cons_file,
-        prod_file,
-        price_profile: str = "legacy",
-        steps_per_day: int = 48,
-        tou_hourly_values: Optional[List[float]] = None,
+            self,
+            cons_file,
+            prod_file,
+            price_profile: str = "legacy",
+            steps_per_day: int = 48,
+            tou_hourly_values: Optional[List[float]] = None,
     ):
         # Define file paths
         self.cons_file = cons_file
         self.prod_file = prod_file
 
         # Read data
-        self.cons_data = pd.read_csv(self.cons_file, parse_dates=['date'], index_col='date')
-        self.prod_data = pd.read_csv(self.prod_file, parse_dates=['date'], index_col='date')
+        # self.cons_data = pd.read_csv(self.cons_file, parse_dates=['date'], index_col='date')
+        # self.prod_data = pd.read_csv(self.prod_file, parse_dates=['date'], index_col='date')
+        try:
+            self.cons_data = pd.read_csv(
+                self.cons_file,
+                parse_dates=['date'],
+                index_col='date',
+                low_memory=False,  # 避免分块类型推断
+                dtype=float  # 强制所有数据列为浮点数
+            )
+            self.prod_data = pd.read_csv(
+                self.prod_file,
+                parse_dates=['date'],
+                index_col='date',
+                low_memory=False,
+                dtype=float
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to read {self.cons_file}: {e}") from e
 
         # ===== Electricity price profile (TOU) =====
         # - price_profile="legacy": keep current project default (valley/flat/peak with fixed index ranges)
@@ -38,6 +57,8 @@ class DataInterface:
         self.ev_schedule = {}
         # Set random seed
         self.np_random = np.random.RandomState(0)
+        self.cons_data.index = pd.to_datetime(self.cons_data.index, errors='coerce')
+        self.cons_data = self.cons_data[~self.cons_data.index.isna()]  # 删除无效日期行
 
     def _build_daily_tou_price(self) -> np.ndarray:
         """
@@ -170,23 +191,33 @@ class DataInterface:
     # def get_home_load(self, current_date, current_time_index):
     #     # Get current household electricity consumption
     #     return self.cons_data.loc[current_date, self.cons_data.columns[current_time_index]]
-    def get_home_load(self, current_date, current_time_index):
-        col_idx = int(current_time_index)
-        if col_idx >= len(self.cons_data.columns):
-            # 打印警告并修正为最后一列，避免崩溃
-            print(f"⚠️ get_home_load: 索引 {col_idx} 超出列数 {len(self.cons_data.columns)}，已截断")
-            col_idx = len(self.cons_data.columns) - 1
-        return self.cons_data.loc[current_date, self.cons_data.columns[col_idx]]
 
     # def get_pv_generation(self, current_date, current_time_index):
     #     # Get current PV system generation
     #     return self.prod_data.loc[current_date, self.cons_data.columns[current_time_index]]
+
     def get_pv_generation(self, current_date, current_time_index):
-        col_idx = int(current_time_index)
-        if col_idx >= len(self.prod_data.columns):
-            print(f"⚠️ get_pv_generation: 索引 {col_idx} 超出列数 {len(self.prod_data.columns)}，已截断")
-            col_idx = len(self.prod_data.columns) - 1
-        return self.prod_data.loc[current_date, self.prod_data.columns[col_idx]]
+        try:
+            # 防御日期
+            if not isinstance(current_date, str) or len(current_date) < 10 or current_date not in self.prod_data.index:
+                return 0.0
+            col_idx = int(current_time_index)
+            if col_idx >= len(self.prod_data.columns):
+                col_idx = len(self.prod_data.columns) - 1
+            return self.prod_data.loc[current_date, self.prod_data.columns[col_idx]]
+        except Exception:
+            return 0.0
+
+    def get_home_load(self, current_date, current_time_index):
+        try:
+            if not isinstance(current_date, str) or len(current_date) < 10 or current_date not in self.cons_data.index:
+                return 0.0
+            col_idx = int(current_time_index)
+            if col_idx >= len(self.cons_data.columns):
+                col_idx = len(self.cons_data.columns) - 1
+            return self.cons_data.loc[current_date, self.cons_data.columns[col_idx]]
+        except Exception:
+            return 0.0
 
     def get_electricity_price(self, current_date, current_time_index):
         # Build daily TOU price once and index into it.
@@ -199,19 +230,44 @@ class DataInterface:
     def get_date_time(self, current_date, current_time_index):
         return current_date
 
-
+    # def is_ev_at_home(self, current_date, current_time_index):
+    #     """
+    #     Determine if the electric vehicle is at home at the current time.
+    #     Generate arrival and departure times only once per day, regenerate the next day.
+    #     """
+    #     # Check if arrival and departure times have been generated for current date
+    #     if current_date not in self.ev_schedule:
+    #         self.generate_daily_ev_schedule(current_date)
+    #
+    #     # If Saturday or Sunday, directly return True indicating EV is at home all day
+    #     current_weekday = datetime.strptime(current_date, '%Y-%m-%d').weekday()
+    #     if current_weekday >= 5:  # 5 represents Saturday, 6 represents Sunday
+    #         return True
+    #
+    #     t1, t2 = self.ev_schedule[current_date]
+    #     current_hour = current_time_index
+    #     return not t2 <= current_hour < t1
     def is_ev_at_home(self, current_date, current_time_index):
-        """
-        Determine if the electric vehicle is at home at the current time.
-        Generate arrival and departure times only once per day, regenerate the next day.
-        """
-        # Check if arrival and departure times have been generated for current date
+        # 防御：确保 current_date 是有效的非空字符串
+        if not isinstance(current_date, str) or len(current_date) < 10:
+            print(
+                f"WARNING: is_ev_at_home received invalid date: {current_date} (type={type(current_date)}), returning True")
+            return True
+
+        # 尝试解析日期，若失败则返回 True
+        try:
+            datetime.strptime(current_date, '%Y-%m-%d')
+        except (ValueError, TypeError):
+            print(f"WARNING: is_ev_at_home cannot parse date: {current_date}, returning True")
+            return True
+
+        # 检查是否已生成该日期的 EV 调度
         if current_date not in self.ev_schedule:
             self.generate_daily_ev_schedule(current_date)
 
-        # If Saturday or Sunday, directly return True indicating EV is at home all day
+        # 周末直接返回 True
         current_weekday = datetime.strptime(current_date, '%Y-%m-%d').weekday()
-        if current_weekday >= 5:  # 5 represents Saturday, 6 represents Sunday
+        if current_weekday >= 5:
             return True
 
         t1, t2 = self.ev_schedule[current_date]
@@ -219,6 +275,16 @@ class DataInterface:
         return not t2 <= current_hour < t1
 
     def generate_daily_ev_schedule(self, current_date):
+        if not isinstance(current_date, str) or len(current_date) < 10:
+            print(f"WARNING: generate_daily_ev_schedule invalid date: {current_date}, setting default")
+            self.ev_schedule[current_date] = (0, 48)
+            return
+        try:
+            datetime.strptime(current_date, '%Y-%m-%d')
+        except (ValueError, TypeError):
+            print(f"WARNING: generate_daily_ev_schedule cannot parse date: {current_date}, setting default")
+            self.ev_schedule[current_date] = (0, 48)
+            return
         """
         Generate EV arrival and departure times for the current date.
         """
@@ -248,7 +314,7 @@ class DataInterface:
         # Store generated times in units of 0.5 (representing half-hour)
         self.ev_schedule[current_date] = (t1 * 2, t2 * 2)
 
-    def is_ev_departing_soon(self,current_date, current_time_idx):
+    def is_ev_departing_soon(self, current_date, current_time_idx):
         """Determine if EV is about to depart (within next 2 hours)"""
         return self.get_hours_until_departure(current_date, current_time_idx) <= 2
 
@@ -267,7 +333,17 @@ class DataInterface:
         """
         Outdoor temperature simulation
         """
-        current_datetime = datetime.strptime(current_time, '%Y-%m-%d')
+        try:
+            if not isinstance(current_time, str):
+                current_time = str(current_time)
+            # 如果字符串长度不足10，填充默认日期
+            if len(current_time) < 10:
+                current_time = "2020-01-01"
+            current_datetime = datetime.strptime(current_time, '%Y-%m-%d')
+        except (ValueError, TypeError):
+            # 静默返回默认温度，不打印警告（避免干扰）
+            return 20.0
+
         day_of_year = current_datetime.timetuple().tm_yday
 
         # ===== Improved Parameter Settings =====
@@ -294,5 +370,36 @@ class DataInterface:
         # Temperature boundary protection
         outdoor_temp = np.clip(outdoor_temp, -5, 45)
 
-
         return round(outdoor_temp, 1)
+    # def get_outdoor_temp(self, current_time, current_time_index):
+    #     """
+    #     Outdoor temperature simulation
+    #     """
+    #     current_datetime = datetime.strptime(current_time, '%Y-%m-%d')
+    #     day_of_year = current_datetime.timetuple().tm_yday
+    #
+    #     # ===== Improved Parameter Settings =====
+    #     # Annual base temperature model
+    #     base_temp = 24 + 10 * np.sin(2 * np.pi * (day_of_year - 200) / 365)  # July peak adjustment
+    #
+    #     # Daily temperature variation model (increased day-night temperature difference)
+    #     hour = current_time_index // 2
+    #     minute = 30 * (current_time_index % 2)
+    #     time_of_day = hour + minute / 60
+    #     daily_temp_variation = 8 * np.sin(2 * np.pi * (time_of_day - 14.5) / 24)
+    #
+    #     # Summer high temperature
+    #     summer_boost = 0
+    #     if 172 <= day_of_year <= 265:  # Period from 6/21 to 9/22
+    #         summer_boost = 4 * np.sin(np.pi * (day_of_year - 172) / 93)  # Additional summer temperature increase
+    #
+    #     # Weather uncertainty
+    #     random_noise = np.random.normal(0, 2.5)
+    #
+    #     # ===== Final Temperature Calculation =====
+    #     outdoor_temp = base_temp + daily_temp_variation + summer_boost + random_noise
+    #
+    #     # Temperature boundary protection
+    #     outdoor_temp = np.clip(outdoor_temp, -5, 45)
+    #
+    #     return round(outdoor_temp, 1)

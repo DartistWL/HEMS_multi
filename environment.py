@@ -2,7 +2,6 @@
 This file is used to simulate the interaction between electric vehicles and the environment, integrating washing machines and air conditioning equipment
 """
 from datetime import datetime, timedelta
-from scipy.stats import uniform
 import matplotlib.dates as mdates
 import torch
 import numpy as np
@@ -11,16 +10,16 @@ from matplotlib.patches import Patch
 from matplotlib.ticker import MaxNLocator
 from interface import DataInterface
 import csv  # Add CSV module
-import os   # Add OS module
+import os  # Add OS module
 import sys
 import pandas as pd
 from typing import Optional, List, Tuple, Dict
 
 
 def build_wash_schedule_action_tuple(
-    steps_per_day: int,
-    pref: Tuple[int, int],
-    wash_duration_hours: float,
+        steps_per_day: int,
+        pref: Tuple[int, int],
+        wash_duration_hours: float,
 ) -> Tuple[int, ...]:
     """
     洗衣机离散动作取值：0=HOLD（不改当前预约），1..N 表示「开洗半步索引 = earliest + (k-1)」。
@@ -60,31 +59,31 @@ def _calendar_day_label_cn(date_str: str) -> str:
 
 class HomeEnergyManagementEnv:
     def __init__(
-        self,
-        ev_capacity=24,
-        ess_capacity=24,
-        charge_efficiency=0.95,
-        discharge_efficiency=0.95,
-        data_interface: Optional[DataInterface] = None,
-        # Episode control (used for StoreNet date split / episode=1 day)
-        episode_length_steps: Optional[int] = None,
-        episode_schedule: Optional[List[Tuple[str, str]]] = None,  # [(house_id, date_str), ...]
-        storenet_base_dir: str = "data/storenet_ireland_2020",
-        price_profile: str = "lee2020",
-        steps_per_day: int = 48,
-        # Battery aging proxy (Version A: throughput / FEC style)
-        # These weights are used as an online penalty in reward shaping.
-        ess_aging_weight: float = 1.0,
-        ev_aging_weight: float = 1.0,
-        # Carbon (Ireland grid marginal intensity, 30-min aligned with steps_per_day=48)
-        # 重要性建议：舒适度 > 成本 > 老化 > 碳 → carbon_weight 应小于 energy_weight 等
-        use_carbon_in_reward: bool = True,
-        carbon_intensity_csv_path: Optional[str] = "data/carbon_2020/eirgrid_roi_co2_2020_30min.csv",
-        carbon_weight: float = 0.032,
-        # Environment stochasticity knobs (for training stability / ablations)
-        ac_user_behavior_std: float = 0.2,  # Std of AC user behavior disturbance
-        ev_daily_km_mean: float = 50.0,     # Mean daily mileage (km)
-        ev_daily_km_sigma: float = 0.2,     # Std of daily mileage (log-normal sigma)
+            self,
+            ev_capacity=24,
+            ess_capacity=24,
+            charge_efficiency=0.95,
+            discharge_efficiency=0.95,
+            data_interface: Optional[DataInterface] = None,
+            # Episode control (used for StoreNet date split / episode=1 day)
+            episode_length_steps: Optional[int] = None,
+            episode_schedule: Optional[List[Tuple[str, str]]] = None,  # [(house_id, date_str), ...]
+            storenet_base_dir: str = "data/storenet_ireland_2020",
+            price_profile: str = "lee2020",
+            steps_per_day: int = 48,
+            # Battery aging proxy (Version A: throughput / FEC style)
+            # These weights are used as an online penalty in reward shaping.
+            ess_aging_weight: float = 1.0,
+            ev_aging_weight: float = 1.0,
+            # Carbon (Ireland grid marginal intensity, 30-min aligned with steps_per_day=48)
+            # 重要性建议：舒适度 > 成本 > 老化 > 碳 → carbon_weight 应小于 energy_weight 等
+            use_carbon_in_reward: bool = True,
+            carbon_intensity_csv_path: Optional[str] = "data/carbon_2020/eirgrid_roi_co2_2020_30min.csv",
+            carbon_weight: float = 0.032,
+            # Environment stochasticity knobs (for training stability / ablations)
+            ac_user_behavior_std: float = 0.2,  # Std of AC user behavior disturbance
+            ev_daily_km_mean: float = 50.0,  # Mean daily mileage (km)
+            ev_daily_km_sigma: float = 0.2,  # Std of daily mileage (log-normal sigma)
     ):
         self.ev_capacity = ev_capacity  # EV battery capacity
         self.ess_capacity = ess_capacity  # ESS battery capacity
@@ -116,7 +115,8 @@ class HomeEnergyManagementEnv:
         self._carbon_kg_per_kwh_max: float = 0.5  # updated when CSV loads; used to normalize observation
 
         # Stochasticity parameters
-        self.ac_user_behavior_std = float(ac_user_behavior_std)
+        # self.ac_user_behavior_std = float(ac_user_behavior_std)
+        self.ac_user_behavior_std = 0.0  # 原为 float(ac_user_behavior_std)
         self.ev_daily_km_mean = float(ev_daily_km_mean)
         self.ev_daily_km_sigma = float(ev_daily_km_sigma)
 
@@ -269,7 +269,7 @@ class HomeEnergyManagementEnv:
             'indoor_temp2': [],
             'outdoor_temp': [],
             'current_daily_cost': 0,
-            'total_load':[],
+            'total_load': [],
             'user_dissatisfaction': []  # User dissatisfaction record
         }
 
@@ -428,7 +428,7 @@ class HomeEnergyManagementEnv:
             # Consider discharge efficiency (assume 95%)
             max_discharge = (state['ess_state'] / delta_t) * self.discharge_efficiency
             max_charge = ((self.ess_capacity - state['ess_state']) / delta_t) / self.charge_efficiency
-            
+
             for idx, action_value in enumerate(self.action_space['battery_power']):
                 # Discharge action: can only select actions less than or equal to current dischargeable amount
                 if action_value < 0 and abs(action_value) > max_discharge:
@@ -441,7 +441,7 @@ class HomeEnergyManagementEnv:
             # 2. EV battery action mask - also dynamic calculation
             max_ev_discharge = (state['ev_battery_state'] / delta_t) * self.discharge_efficiency
             max_ev_charge = ((self.ev_capacity - state['ev_battery_state']) / delta_t) / self.charge_efficiency
-            
+
             for idx, action_value in enumerate(self.action_space['ev_power']):
                 # Discharge limit
                 if action_value < 0 and abs(action_value) > max_ev_discharge:
@@ -475,7 +475,8 @@ class HomeEnergyManagementEnv:
     def reset(self):
         self.total_cost = 0
         # Initialize episode calendar
-        if self.episode_length_steps is not None and self.episode_schedule is not None and len(self.episode_schedule) > 0:
+        if self.episode_length_steps is not None and self.episode_schedule is not None and len(
+                self.episode_schedule) > 0:
             house_id, date_str = self.episode_schedule[self.episode_schedule_cursor % len(self.episode_schedule)]
             self.episode_schedule_cursor += 1
             # Switch to the corresponding household data for this episode
@@ -489,6 +490,9 @@ class HomeEnergyManagementEnv:
                 # Ensure EV arrival/departure randomness reproducible for this run
                 self.data_interface.seed(self._seed_value)
             self.current_time = self._normalize_date_str(date_str)
+            if not isinstance(self.current_time, str) or len(self.current_time) < 10:
+                print(f"WARNING: Invalid date '{self.current_time}', using fallback date 2020-01-01")
+                self.current_time = "2020-01-01"
             # 供 visualize() / 调试：本回合对应的 StoreNet 住户与日历日（评估 p3 等为「第 1 个评估 episode」的这一天）
             self._current_episode_house_id = house_id
             self._current_episode_date_str = self.current_time
@@ -519,7 +523,7 @@ class HomeEnergyManagementEnv:
             'ewh_power': 0,
             **self._calendar_observation_dict(),
         }
-        self.ev_battery_record = []   # Reset records
+        self.ev_battery_record = []  # Reset records
         self.ess_state_record = []
         self.home_load_record = []
         self.pv_generation_record = []
@@ -618,8 +622,7 @@ class HomeEnergyManagementEnv:
             max_charge = min(action['ev_power'], (self.ev_capacity - ev_soc) / 0.5 / self.charge_efficiency)
             action['ev_power'] = max_charge
 
-
-        self.current_ev_power=action['ev_power']  # Store current action
+        self.current_ev_power = action['ev_power']  # Store current action
         current_dt = datetime.strptime(self.current_time, '%Y-%m-%d') + \
                      timedelta(minutes=30 * self.current_time_index)
 
@@ -627,10 +630,12 @@ class HomeEnergyManagementEnv:
         self.outdoor_temp = self.data_interface.get_outdoor_temp(self.current_time, self.current_time_index)
 
         # Update AC state
-        new_air_conditioner_power, self.indoor_temp = self.update_air_conditioner(action['Air_conditioner_set_temp'], self.indoor_temp)
+        new_air_conditioner_power, self.indoor_temp = self.update_air_conditioner(action['Air_conditioner_set_temp'],
+                                                                                  self.indoor_temp)
         self.state['Air_conditioner_power'] = new_air_conditioner_power
 
-        new_air_conditioner_power2, self.indoor_temp2 = self.update_air_conditioner(action['Air_conditioner_set_temp2'], self.indoor_temp2)
+        new_air_conditioner_power2, self.indoor_temp2 = self.update_air_conditioner(action['Air_conditioner_set_temp2'],
+                                                                                    self.indoor_temp2)
         self.state['Air_conditioner_power2'] = new_air_conditioner_power2
 
         # Update washing machine state
@@ -674,6 +679,10 @@ class HomeEnergyManagementEnv:
             **self._wash_schedule_observation_dict(),
             **self._carbon_observation_dict(),
         }
+        for key in ['home_load', 'pv_generation', 'electricity_price', 'temperature']:
+            if not np.isfinite(self.state[key]):
+                print(f"WARNING: state[{key}] is {self.state[key]}, reset to 0")
+                self.state[key] = 0.0
 
         reward = self.calculate_reward(state, action)
         self.state['ess_charge_pv_fraction'] = self._ess_charge_pv_fraction()
@@ -749,18 +758,84 @@ class HomeEnergyManagementEnv:
         # min_soc = self.ev_min_charge * 0.8  # Maintain safety margin
         return np.clip(new_soc, 0, self.ev_capacity)
 
+    # def total_load_compute(self):
+    #     ev_power = self.current_ev_power
+    #     ess_power = self.current_battery_power
+    #     pv_load = self.state['pv_generation']
+    #     home_load = self.state['home_load']
+    #     air_cond_power = self.state['Air_conditioner_power']
+    #     air_cond_power2 = self.state['Air_conditioner_power2']
+    #     wash_machine_power = self.state['wash_machine_state'] * self.wash_machine_power
+    #     ewh_power = self.state['ewh_power']
+    #     total_load = (home_load + air_cond_power + air_cond_power2 + wash_machine_power + ewh_power + ev_power
+    #                   + ess_power - pv_load)
+    #     return total_load
     def total_load_compute(self):
-        ev_power = self.current_ev_power
-        ess_power = self.current_battery_power
-        pv_load = self.state['pv_generation']
-        home_load = self.state['home_load']
-        air_cond_power = self.state['Air_conditioner_power']
-        air_cond_power2 = self.state['Air_conditioner_power2']
-        wash_machine_power = self.state['wash_machine_state'] * self.wash_machine_power
-        ewh_power = self.state['ewh_power']
-        total_load = (home_load + air_cond_power + air_cond_power2 + wash_machine_power + ewh_power + ev_power
-                      + ess_power - pv_load)
-        return total_load
+        try:
+            # 获取所有变量，并替换 NaN/Inf 为 0
+            ev_power = self.current_ev_power
+            if not np.isfinite(ev_power):
+                print(f"WARNING: ev_power is {ev_power}, reset to 0")
+                ev_power = 0.0
+                self.current_ev_power = 0.0
+
+            ess_power = self.current_battery_power
+            if not np.isfinite(ess_power):
+                print(f"WARNING: ess_power is {ess_power}, reset to 0")
+                ess_power = 0.0
+                self.current_battery_power = 0.0
+
+            pv_load = self.state.get('pv_generation', 0.0)
+            if not np.isfinite(pv_load):
+                print(f"WARNING: pv_load is {pv_load}, reset to 0")
+                pv_load = 0.0
+                self.state['pv_generation'] = 0.0
+
+            home_load = self.state.get('home_load', 0.0)
+            if not np.isfinite(home_load):
+                print(f"WARNING: home_load is {home_load}, reset to 0")
+                home_load = 0.0
+                self.state['home_load'] = 0.0
+
+            air_cond_power = self.state.get('Air_conditioner_power', 0.0)
+            if not np.isfinite(air_cond_power):
+                print(f"WARNING: air_cond_power is {air_cond_power}, reset to 0")
+                air_cond_power = 0.0
+                self.state['Air_conditioner_power'] = 0.0
+
+            air_cond_power2 = self.state.get('Air_conditioner_power2', 0.0)
+            if not np.isfinite(air_cond_power2):
+                print(f"WARNING: air_cond_power2 is {air_cond_power2}, reset to 0")
+                air_cond_power2 = 0.0
+                self.state['Air_conditioner_power2'] = 0.0
+
+            wash_machine_state = self.state.get('wash_machine_state', 0)
+            if not np.isfinite(wash_machine_state):
+                print(f"WARNING: wash_machine_state is {wash_machine_state}, reset to 0")
+                wash_machine_state = 0
+                self.state['wash_machine_state'] = 0
+
+            wash_machine_power = wash_machine_state * self.wash_machine_power
+            if not np.isfinite(wash_machine_power):
+                wash_machine_power = 0.0
+
+            ewh_power = self.state.get('ewh_power', 0.0)
+            if not np.isfinite(ewh_power):
+                print(f"WARNING: ewh_power is {ewh_power}, reset to 0")
+                ewh_power = 0.0
+                self.state['ewh_power'] = 0.0
+
+            total_load = (home_load + air_cond_power + air_cond_power2 + wash_machine_power + ewh_power +
+                          ev_power + ess_power - pv_load)
+            if not np.isfinite(total_load):
+                print(f"CRITICAL: total_load is {total_load}, returning 0")
+                return 0.0
+            return total_load
+        except Exception as e:
+            print(f"CRASH in total_load_compute: {e}")
+            print(
+                f"ev_power={self.current_ev_power}, ess_power={self.current_battery_power}, pv_load={self.state.get('pv_generation')}, ...")
+            raise
 
     def update_ess(self, ess_charge_discharge, pv_generation):
         # assert charge_power * discharge_power == 0, "ESS cannot charge and discharge simultaneously"
@@ -768,7 +843,7 @@ class HomeEnergyManagementEnv:
 
         if ess_charge_discharge > 0:  # Charge action = pv + grid
             new_ess = self.state['ess_state'] + ess_charge_discharge * self.charge_efficiency * 0.5
-        else:   # Discharge action = home + grid
+        else:  # Discharge action = home + grid
             new_ess = self.state['ess_state'] + ess_charge_discharge / self.discharge_efficiency * 0.5
 
         return np.clip(new_ess, 0, self.ess_capacity)
@@ -795,12 +870,29 @@ class HomeEnergyManagementEnv:
         else:
             self.time_deviation = 0
 
+    # def _wash_abs_earliest_start_step(self) -> int:
+    #     """当日允许开洗的最早半步索引（偏好窗起点）。"""
+    #     return int(self.wash_machine_preferred_time[0] * self.steps_per_day / 24)
+    #
+    # def _wash_abs_latest_start_step(self) -> int:
+    #     """当日允许开洗的最晚半步索引（保证洗涤结束不晚于偏好窗终点）。"""
+    #     dur_steps = max(1, int(round(float(self.wash_machine_duration) * self.steps_per_day / 24)))
+    #     latest = int(self.wash_machine_preferred_time[1] * self.steps_per_day / 24) - dur_steps
+    #     e = self._wash_abs_earliest_start_step()
+    #     return max(e, min(self.steps_per_day - 1, latest))
+
     def _wash_abs_earliest_start_step(self) -> int:
-        """当日允许开洗的最早半步索引（偏好窗起点）。"""
+        if not isinstance(self.steps_per_day, int):
+            print(
+                f"ERROR: steps_per_day is {type(self.steps_per_day)} with value {self.steps_per_day}, resetting to 48")
+            self.steps_per_day = 48
         return int(self.wash_machine_preferred_time[0] * self.steps_per_day / 24)
 
     def _wash_abs_latest_start_step(self) -> int:
-        """当日允许开洗的最晚半步索引（保证洗涤结束不晚于偏好窗终点）。"""
+        if not isinstance(self.steps_per_day, int):
+            print(
+                f"ERROR: steps_per_day is {type(self.steps_per_day)} with value {self.steps_per_day}, resetting to 48")
+            self.steps_per_day = 48
         dur_steps = max(1, int(round(float(self.wash_machine_duration) * self.steps_per_day / 24)))
         latest = int(self.wash_machine_preferred_time[1] * self.steps_per_day / 24) - dur_steps
         e = self._wash_abs_earliest_start_step()
@@ -870,16 +962,16 @@ class HomeEnergyManagementEnv:
         _idx = int(self.current_time_index)
         _ep = getattr(self, "episode_length_steps", None)
         _last_step_of_episode = (
-            _ep is not None
-            and int(_ep) > 0
-            and int(_ep) <= _spd
-            and _idx >= int(_ep) - 1
+                _ep is not None
+                and int(_ep) > 0
+                and int(_ep) <= _spd
+                and _idx >= int(_ep) - 1
         )
         _need_daily = (not self.has_run_in_current_period) and self.remaining_runtime <= 0
         _force = _need_daily and (
-            _idx >= latest
-            or _idx >= _spd - 1
-            or _last_step_of_episode
+                _idx >= latest
+                or _idx >= _spd - 1
+                or _last_step_of_episode
         )
 
         def _start_immediate_wash() -> int:
@@ -940,63 +1032,150 @@ class HomeEnergyManagementEnv:
             return self.wash_machine_state
         return _schedule_at_step(tgt)
 
+    # def update_air_conditioner(self, set_temp, indoor_temp):
+    #     """Update AC power"""
+    #     # Calculate difference between set temperature and current indoor temperature
+    #     temp_diff = set_temp - indoor_temp
+    #     # Fuzzy control rules: determine power based on temperature difference
+    #     if temp_diff > 0:  # Heating mode
+    #         # Define fuzzy control rules for heating mode
+    #         rules = [
+    #             {'range': (0, 0.5), 'power': 0},
+    #             {'range': (0.5, 1), 'power': 0.5},  # 0.5 enables precise control
+    #             {'range': (1, 2), 'power': 1.0},
+    #             {'range': (2, 3), 'power': 1.5},
+    #             {'range': (3, 4), 'power': 2.0},
+    #             {'range': (4, np.inf), 'power': 3.0}
+    #         ]
+    #     else:
+    #         # Define fuzzy control rules for cooling mode
+    #         rules = [
+    #             {'range': (-0.5, 0), 'power': 0},
+    #             {'range': (-1, -0.5), 'power': 0.5},  # 0.5 enables precise control
+    #             {'range': (-2, -1), 'power': 1.0},
+    #             {'range': (-3, -2), 'power': 1.5},
+    #             {'range': (-4, -3), 'power': 2.0},
+    #             {'range': (-np.inf, -4), 'power': 3.0}
+    #         ]
+    #
+    #     # Find corresponding power based on temperature difference
+    #     power = 0  # Default power
+    #     for rule in rules:
+    #         if rule['range'][0] <= temp_diff < rule['range'][1]:
+    #             power = rule['power']
+    #             break
+    #
+    #     # Dynamically calculate temperature change rate
+    #     max_power = 3.0  # AC maximum power
+    #     efficiency = power / max_power if max_power > 0 else 0  # Calculate efficiency at current power
+    #     temp_change = self.temp_change_rate * efficiency * temp_diff  # Calculate temperature change based on power and temperature difference
+    #
+    #     # Simulate random disturbance from user behavior
+    #     # Optional disturbance term for user-driven AC fluctuations.
+    #     # When `ac_user_behavior_std=0`, this becomes deterministic.
+    #     user_behavior = np.random.normal(0, self.ac_user_behavior_std)
+    #     temp_change += user_behavior  # Add random disturbance to temperature change
+    #
+    #     # When AC is off (power == 0), indoor temperature gradually approaches outdoor temperature
+    #     if power == 0:
+    #         # Rate at which indoor temperature approaches outdoor temperature can be adjusted
+    #         temp_change += (self.outdoor_temp - indoor_temp) * 0.4 * self.temp_change_rate
+    #
+    #     # Update indoor temperature
+    #     indoor_temp += temp_change
+    #
+    #     # Ensure indoor temperature is within reasonable range
+    #     indoor_temp = np.clip(indoor_temp, 10, 40)
+    #
+    #     # Ensure AC power is within reasonable range
+    #     power = np.clip(power, 0, 3.0)
+    #
+    #     return power, indoor_temp
+
     def update_air_conditioner(self, set_temp, indoor_temp):
-        """Update AC power"""
-        # Calculate difference between set temperature and current indoor temperature
+        """Update AC power with numerical stability protection (enhanced)"""
+        # 1. 确保输入为浮点数且有限
+        set_temp = float(set_temp)
+        indoor_temp = float(indoor_temp)
+
+        # 2. 修复成员变量中的 NaN/Inf
+        if not np.isfinite(self.temp_change_rate):
+            self.temp_change_rate = 0.5
+        if not np.isfinite(self.outdoor_temp):
+            self.outdoor_temp = 25.0
+        if not np.isfinite(self.ac_user_behavior_std):
+            self.ac_user_behavior_std = 0.0
+
+        # 3. 如果输入无效，返回安全值
+        if not np.isfinite(set_temp) or not np.isfinite(indoor_temp):
+            print(f"⚠️ AC: invalid input set_temp={set_temp}, indoor_temp={indoor_temp}")
+            return 0.0, 25.0
+
         temp_diff = set_temp - indoor_temp
-        # Fuzzy control rules: determine power based on temperature difference
-        if temp_diff > 0:  # Heating mode
-            # Define fuzzy control rules for heating mode
+        # 限制温度差范围，并替换 NaN
+        temp_diff = np.clip(temp_diff, -10.0, 10.0)
+        if not np.isfinite(temp_diff):
+            temp_diff = 0.0
+
+        # 模糊控制规则
+        if temp_diff > 0:
             rules = [
                 {'range': (0, 0.5), 'power': 0},
-                {'range': (0.5, 1), 'power': 0.5},  # 0.5 enables precise control
+                {'range': (0.5, 1), 'power': 0.5},
                 {'range': (1, 2), 'power': 1.0},
                 {'range': (2, 3), 'power': 1.5},
                 {'range': (3, 4), 'power': 2.0},
                 {'range': (4, np.inf), 'power': 3.0}
             ]
         else:
-            # Define fuzzy control rules for cooling mode
             rules = [
                 {'range': (-0.5, 0), 'power': 0},
-                {'range': (-1, -0.5), 'power': 0.5},  # 0.5 enables precise control
+                {'range': (-1, -0.5), 'power': 0.5},
                 {'range': (-2, -1), 'power': 1.0},
                 {'range': (-3, -2), 'power': 1.5},
                 {'range': (-4, -3), 'power': 2.0},
                 {'range': (-np.inf, -4), 'power': 3.0}
             ]
 
-        # Find corresponding power based on temperature difference
-        power = 0  # Default power
+        power = 0.0
         for rule in rules:
             if rule['range'][0] <= temp_diff < rule['range'][1]:
                 power = rule['power']
                 break
 
-        # Dynamically calculate temperature change rate
-        max_power = 3.0  # AC maximum power
-        efficiency = power / max_power if max_power > 0 else 0  # Calculate efficiency at current power
-        temp_change = self.temp_change_rate * efficiency * temp_diff  # Calculate temperature change based on power and temperature difference
+        # 确保功率有效
+        power = np.clip(power, 0.0, 3.0)
+        if not np.isfinite(power):
+            power = 0.0
 
-        # Simulate random disturbance from user behavior
-        # Optional disturbance term for user-driven AC fluctuations.
-        # When `ac_user_behavior_std=0`, this becomes deterministic.
+        # 动态温度变化
+        max_power = 3.0
+        efficiency = power / max_power if max_power > 0 else 0
+        temp_change = self.temp_change_rate * efficiency * temp_diff
+        if not np.isfinite(temp_change):
+            temp_change = 0.0
+
+        # 随机扰动（限制范围）
         user_behavior = np.random.normal(0, self.ac_user_behavior_std)
-        temp_change += user_behavior  # Add random disturbance to temperature change
+        user_behavior = np.clip(user_behavior, -5.0, 5.0)
+        if not np.isfinite(user_behavior):
+            user_behavior = 0.0
+        temp_change += user_behavior
 
-        # When AC is off (power == 0), indoor temperature gradually approaches outdoor temperature
+        # 当 AC 关闭时，温度趋向室外温度
         if power == 0:
-            # Rate at which indoor temperature approaches outdoor temperature can be adjusted
-            temp_change += (self.outdoor_temp - indoor_temp) * 0.4 * self.temp_change_rate
+            delta = (self.outdoor_temp - indoor_temp) * 0.4 * self.temp_change_rate
+            if np.isfinite(delta):
+                temp_change += delta
 
-        # Update indoor temperature
+        # 更新室内温度
         indoor_temp += temp_change
+        indoor_temp = np.clip(indoor_temp, 10.0, 40.0)
+        if not np.isfinite(indoor_temp):
+            indoor_temp = 25.0
 
-        # Ensure indoor temperature is within reasonable range
-        indoor_temp = np.clip(indoor_temp, 10, 40)
-
-        # Ensure AC power is within reasonable range
-        power = np.clip(power, 0, 3.0)
+        # 最终确保功率有效
+        power = np.clip(power, 0.0, 3.0)
 
         return power, indoor_temp
 
@@ -1053,7 +1232,7 @@ class HomeEnergyManagementEnv:
         # Case 1: Temperature change when injecting cold water
         if flow_rate > 0:
             # Calculate volume change corresponding to water usage (assuming total tank volume unchanged)
-            used_water_volume = flow_rate * delta_t   # Assume flow rate unit is L/h, convert to L
+            used_water_volume = flow_rate * delta_t  # Assume flow rate unit is L/h, convert to L
             # Inject same volume of cold water
             injected_cold_volume = used_water_volume
 
@@ -1096,7 +1275,7 @@ class HomeEnergyManagementEnv:
             rules = [
                 {'range': (-np.inf, -3), 'power': 0.0},
                 {'range': (-3, 1), 'power': 0.0},
-                {'range': (1, 4), 'power': 0.4 + 0.1 * max(0, temp_diff-1)},  # Dynamic proportion
+                {'range': (1, 4), 'power': 0.4 + 0.1 * max(0, temp_diff - 1)},  # Dynamic proportion
                 {'range': (4, 6), 'power': 1.0},
                 {'range': (6, np.inf), 'power': 1.2}  # Allow short-term over-power
             ]
@@ -1159,9 +1338,9 @@ class HomeEnergyManagementEnv:
             df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True)
             gcol = None
             for name in (
-                "carbon_intensity_gco2_per_kwh",
-                "carbon_intensity_gco2_per_kwh_roi",
-                "carbon_intensity_gco2_per_kwh_nsw",
+                    "carbon_intensity_gco2_per_kwh",
+                    "carbon_intensity_gco2_per_kwh_roi",
+                    "carbon_intensity_gco2_per_kwh_nsw",
             ):
                 if name in df.columns:
                     gcol = name
@@ -1172,7 +1351,7 @@ class HomeEnergyManagementEnv:
             df = df.sort_values("timestamp_utc").reset_index(drop=True)
             self._carbon_df = df
             self._carbon_kg_per_kwh_max = float(df["carbon_intensity_kgco2_per_kwh"].max())
-            print(f"✅ Loaded carbon intensity for reward: {p} ({len(df)} rows)")
+            # print(f"✅ Loaded carbon intensity for reward: {p} ({len(df)} rows)")
         except Exception as e:
             print(f"⚠️ Failed to load carbon CSV ({p}): {e}; carbon term disabled.")
             self._carbon_df = None
@@ -1180,9 +1359,12 @@ class HomeEnergyManagementEnv:
 
     def _simulation_time_utc(self) -> pd.Timestamp:
         """Calendar date + half-hour step interpreted as Europe/Dublin, then UTC."""
-        naive = datetime.strptime(self.current_time, "%Y-%m-%d") + timedelta(
-            minutes=int(30 * int(self.current_time_index))
-        )
+        try:
+            naive = datetime.strptime(self.current_time, "%Y-%m-%d") + timedelta(
+                minutes=int(30 * int(self.current_time_index))
+            )
+        except (ValueError, TypeError):
+            naive = datetime(2020, 1, 1)  # fallback
         ts = pd.Timestamp(naive)
         try:
             loc = ts.tz_localize("Europe/Dublin", ambiguous="infer", nonexistent="shift_forward")
@@ -1341,7 +1523,8 @@ class HomeEnergyManagementEnv:
         user_dissatisfaction_penalty = 0
         user_dissatisfaction_penalty = (self.user_satisfaction_weight0 * self.calculate_user_dissatisfaction0() +
                                         self.user_satisfaction_weight1 * self.calculate_user_dissatisfaction1() +
-                                    self.user_satisfaction_weight2 * self.calculate_user_dissatisfaction2(state, action))
+                                        self.user_satisfaction_weight2 * self.calculate_user_dissatisfaction2(state,
+                                                                                                              action))
         # user_dissatisfaction_penalty = np.clip(user_dissatisfaction_penalty, -20, 20)
 
         temp_reward = self.calculate_temp_reward(state['ewh_temp'])
@@ -1351,16 +1534,14 @@ class HomeEnergyManagementEnv:
         # 优先级经验：舒适度(用户+温度+约束) > 电费 > 老化 > 碳（carbon_weight 宜明显小于 energy_weight）
         reward = (
                 - self.energy_weight * energy_cost
-                - self.violation_weight * violation    # EV and ESS upper and lower bound constraints
+                - self.violation_weight * violation  # EV and ESS upper and lower bound constraints
                 - aging_penalty
                 + self.ess_weight * ess_reward
                 + self.ev_weight * ev_reward
-                - user_dissatisfaction_penalty   # User dissatisfaction penalty
+                - user_dissatisfaction_penalty  # User dissatisfaction penalty
                 + self.temp_weight * temp_reward
                 - carbon_penalty_weighted
         )
-
-
 
         # # New exploration reward (prevent premature convergence)
         # if np.random.rand() < 0.1:  # 10% probability add noise
@@ -1412,11 +1593,11 @@ class HomeEnergyManagementEnv:
             self._ess_stored_from_grid_kwh *= k
 
     def _update_ess_energy_source_bookkeeping(
-        self,
-        state: Dict,
-        action: Dict,
-        total_consumption: float,
-        _net_demand: float,
+            self,
+            state: Dict,
+            action: Dict,
+            total_consumption: float,
+            _net_demand: float,
     ) -> None:
         """
         区分 ESS 中能量来自光伏还是电网（论文叙事：序贯归因）。
@@ -1548,13 +1729,19 @@ class HomeEnergyManagementEnv:
         exceed = max(0.0, abs(float(value) - float(target)) - float(deadband))
         return float(min(float(scale) * (exceed ** 2), float(cap)))
 
+    # def is_terminal_state(self):
+    #     # Episode termination for StoreNet 1-day setup:
+    #     if self.episode_length_steps is not None and self.episode_length_steps > 0:
+    #         # done is evaluated before time index increment in step()
+    #         return self.current_time_index >= (self.episode_length_steps - 1)
+    #
+    #     # Schedule-less rolling episode: end after last calendar day present in pivot cons_data
+    #     return self.current_time > self._last_cons_date_str(self.data_interface)
     def is_terminal_state(self):
-        # Episode termination for StoreNet 1-day setup:
+        # 如果设置了 episode_length_steps 且大于 0，则按步数终止
         if self.episode_length_steps is not None and self.episode_length_steps > 0:
-            # done is evaluated before time index increment in step()
             return self.current_time_index >= (self.episode_length_steps - 1)
-
-        # Schedule-less rolling episode: end after last calendar day present in pivot cons_data
+        # 否则按日期终止（数据用完）
         return self.current_time > self._last_cons_date_str(self.data_interface)
 
     def seed(self, seed=None):
@@ -1607,7 +1794,7 @@ class HomeEnergyManagementEnv:
 
         # self.energy_weight = 5.0 * (1 - 0.8*progress)  # Linear decay
         # self.temp_weight = 1 / (1 + np.exp(-10*(progress-0.3)))  # S-shaped growth
-        self.violation_weight = 3-2*progress  # April 29 attempt this method, try saving model snapshots if ineffective
+        self.violation_weight = 3 - 2 * progress  # April 29 attempt this method, try saving model snapshots if ineffective
         # self.user_satisfaction_weight1 = 0.3 + 0.7*progress
         # self.user_satisfaction_weight2 = 0.1 + 0.4*progress
         # self.ess_weight = 3.0 + 2*progress
@@ -1960,7 +2147,6 @@ class HomeEnergyManagementEnv:
         plt.savefig('figures/environment_plots/p7.png')
         plt.close()
 
-
         # ===== Sixth canvas: Water heater status =====
         plt.figure(figsize=(20, 10))
         mpl_dates = mdates.date2num(self.records['timestamps'])
@@ -2151,11 +2337,11 @@ class HomeEnergyManagementEnv:
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"simulation_data_{timestamp}.csv"
-        
+
         # Ensure data directory exists
         os.makedirs('simulation_data', exist_ok=True)
         filepath = os.path.join('simulation_data', filename)
-        
+
         # Prepare data dictionary
         data_dict = {
             'timestamp': self.records['timestamps'],
@@ -2186,14 +2372,14 @@ class HomeEnergyManagementEnv:
             'air_conditioner_power2': self.air_conditioner_power_record2,
             'daily_costs': self.records['daily_costs']
         }
-        
+
         # Handle length mismatch issues.
         # Some record buffers can be empty (len==0) depending on episode/device usage,
         # so we must not access value[-1].
         list_values = [v for v in data_dict.values() if isinstance(v, list)]
         list_lengths = [len(v) for v in list_values]
         max_length = max(list_lengths) if list_lengths else 0
-        
+
         # Ensure all lists have consistent length
         for key, value in data_dict.items():
             if isinstance(value, list):
@@ -2208,18 +2394,18 @@ class HomeEnergyManagementEnv:
                 elif len(value) > max_length:
                     # Truncate to maximum length
                     data_dict[key] = value[:max_length]
-        
+
         # Create DataFrame
         df = pd.DataFrame(data_dict)
-        
+
         # Save to CSV
         df.to_csv(filepath, index=False, encoding='utf-8-sig')
         print(f"Simulation data saved to: {filepath}")
-        
+
         # Also save reward component data
         reward_filename = filename.replace('.csv', '_rewards.csv')
         reward_filepath = os.path.join('simulation_data', reward_filename)
-        
+
         reward_data = {}
         for key, values in self.reward_components.items():
             if isinstance(values, list):
@@ -2231,20 +2417,20 @@ class HomeEnergyManagementEnv:
                         reward_data[key] = values + [values[-1]] * missing
                 else:
                     reward_data[key] = values[:max_length]
-        
+
         reward_df = pd.DataFrame(reward_data)
         reward_df.to_csv(reward_filepath, index=False, encoding='utf-8-sig')
         print(f"Reward component data saved to: {reward_filepath}")
-        
+
         return filepath
 
 
 def make_storenet_train_env(
-    seed: int = 42,
-    train_days: int = 200,
-    val_days: int = 30,
-    test_days: int = 100,
-    **env_kwargs,
+        seed: int = 42,
+        train_days: int = 200,
+        val_days: int = 30,
+        test_days: int = 100,
+        **env_kwargs,
 ) -> HomeEnergyManagementEnv:
     """
     默认训练用环境：StoreNet Ireland 2020，划分方式与 PPO_3rd / DroQ 主脚本一致。
@@ -2279,4 +2465,3 @@ def make_storenet_train_env(
         steps_per_day=48,
         **env_kwargs,
     )
-

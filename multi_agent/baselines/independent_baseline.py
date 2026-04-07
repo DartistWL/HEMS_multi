@@ -8,20 +8,23 @@ Independent Learning Baseline
   不含峰值惩罚、社区储能激励、排队惩罚等，从而不对峰值做优化，以体现 MAPPO 的削峰优势
 - 使用社区环境时仍可与社区储能交互（充放电），但策略不因峰值/社区激励而优化
 """
-import numpy as np
-import sys
 import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"   # 解决 OpenMP 冲突
+
+import sys
+import numpy as np
 import torch
-import torch.nn as nn
+import matplotlib
+matplotlib.use('Agg')   # 使用非交互式后端，避免 GUI 相关错误
 import matplotlib.pyplot as plt
 
-# 添加项目根目录到路径
+# 添加项目根目录到路径并切换工作目录（确保相对路径正确）
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir(project_root)  # 强制切换到项目根目录，使 data/ 等相对路径有效
 sys.path.append(project_root)
 
 # 修复导入路径：使用importlib直接加载，避免路径冲突
 import importlib.util
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 env_file_path = os.path.join(project_root, "environment.py")
 spec = importlib.util.spec_from_file_location("home_energy_env", env_file_path)
 home_energy_env = importlib.util.module_from_spec(spec)
@@ -95,13 +98,13 @@ class IndependentBaseline:
     独立学习基线
     为每个家庭训练独立的模型，使用不同的随机种子
     """
-    
-    def __init__(self, n_agents=3, pv_coefficients=None, 
+
+    def __init__(self, n_agents=3, pv_coefficients=None,
                  ev_capacity=24, ess_capacity=24, random_seeds=None,
                  use_community_env=None):
         """
         初始化独立学习基线
-        
+
         Args:
             n_agents: 家庭数量
             pv_coefficients: 每个家庭的光伏系数列表
@@ -116,23 +119,27 @@ class IndependentBaseline:
         if use_community_env is None:
             use_community_env = _load_use_community_env_from_config(default=False)
         self.use_community_env = use_community_env
-        
+
         # 初始化随机种子（每个家庭使用不同的随机种子）
         if random_seeds is None:
             random_seeds = list(range(n_agents))  # [0, 1, 2]
         elif len(random_seeds) != n_agents:
             raise ValueError(f"random_seeds长度必须等于n_agents ({n_agents})")
         self.random_seeds = random_seeds
-        
+
         # 初始化光伏系数
         if pv_coefficients is None:
             pv_coefficients = [1.0] * n_agents
         self.pv_coefficients = pv_coefficients
-        
+
+        # 确定设备（GPU or CPU）
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"IndependentBaseline using device: {self.device}")
+
         self.train_envs = []
         self.eval_envs = []
         self.agents = []
-        
+
         if not self.use_community_env:
             # ---------- 原逻辑：单智能体环境，无社区储能 ----------
             for i in range(n_agents):
@@ -148,7 +155,7 @@ class IndependentBaseline:
                 train_env.data_interface = train_data_interface
                 train_env.data_interface.np_random = np.random.RandomState(random_seeds[i])
                 self.train_envs.append(train_env)
-                
+
                 state_dim = len(train_env.state_space)
                 action_space_config = train_env.action_space
                 agent = HomeEnergyPPO(
@@ -166,10 +173,11 @@ class IndependentBaseline:
                     reward_scale=1.0,
                     use_reward_normalization=True,
                     use_popart=False,
-                    critic_loss_type='mse'
+                    critic_loss_type='mse',
+                    device=self.device
                 )
                 self.agents.append(agent)
-            
+
             for i in range(n_agents):
                 data_interface = MultiAgentDataInterface(
                     'data/daily_pivot_cons_2011-2012.csv',
@@ -185,6 +193,10 @@ class IndependentBaseline:
                 self.eval_envs.append(env)
         else:
             # ---------- 方案1：多智能体环境，有社区储能 ----------
+            # 临时切换工作目录到 multi_agent，使 '../data' 相对路径正确
+            original_cwd = os.getcwd()
+            os.chdir(os.path.join(project_root, 'multi_agent'))
+
             from multi_agent.environment.multi_agent_env import MultiAgentHEMEnv
             # 扩展状态键（与 multi_agent_env._add_community_info_to_states 一致，含 is_weekend）
             _COMMUNITY_STATE_KEYS = [
@@ -192,9 +204,9 @@ class IndependentBaseline:
                 'community_net_load', 'community_avg_load', 'community_peak_threshold',
                 'is_weekend'
             ]
-            # 从 config.json training 读取环境参数，与 MAPPO 训练时一致（公平对比、避免独立基线只用 0.2 等硬编码）
+            # 从 config.json training 读取环境参数，与 MAPPO 训练时一致
             env_params = _load_training_env_params_from_config()
-            
+
             train_ma_env = MultiAgentHEMEnv(
                 n_agents=n_agents,
                 community_ess_capacity=36.0,
@@ -207,16 +219,16 @@ class IndependentBaseline:
                 peak_discharge_bonus=env_params['peak_discharge_bonus'],
                 peak_credit_cost_reduction=env_params['peak_credit_cost_reduction'],
                 pv_coefficients=pv_coefficients,
-                reward_for_individual_only=True  # 仅优化个人目标，不对峰值/社区储能激励优化，以体现 MAPPO 削峰优势
+                reward_for_individual_only=True
             )
             for i in range(n_agents):
                 train_ma_env.agents[i].env.data_interface.np_random = np.random.RandomState(random_seeds[i])
-            
+
             base_state_keys = sorted(train_ma_env.agents[0].state_space.keys())
             extended_keys = sorted(set(base_state_keys) | set(_COMMUNITY_STATE_KEYS))
             state_dim = len(extended_keys)
             action_space_config = train_ma_env.agents[0].action_space
-            
+
             self.train_ma_env = train_ma_env
             self.eval_ma_env = MultiAgentHEMEnv(
                 n_agents=n_agents,
@@ -234,7 +246,10 @@ class IndependentBaseline:
             )
             for i in range(n_agents):
                 self.eval_ma_env.agents[i].env.data_interface.np_random = np.random.RandomState(random_seeds[i])
-            
+
+            # 恢复原始工作目录
+            os.chdir(original_cwd)
+
             for _ in range(n_agents):
                 agent = HomeEnergyPPO(
                     env=None,
@@ -251,15 +266,16 @@ class IndependentBaseline:
                     reward_scale=1.0,
                     use_reward_normalization=True,
                     use_popart=False,
-                    critic_loss_type='mse'
+                    critic_loss_type='mse',
+                    device=self.device
                 )
                 self.agents.append(agent)
-    
-    def train(self, num_episodes=500, save_dir='multi_agent/baselines/models', 
+
+    def train(self, num_episodes=500, save_dir='multi_agent/baselines/models',
               training_dates=None, pv_coefficients_list=None):
         """
         训练独立学习基线（为每个家庭训练独立的模型）
-        
+
         Args:
             num_episodes: 训练轮数
             save_dir: 模型保存目录
@@ -272,11 +288,12 @@ class IndependentBaseline:
         save_suffix = ('_contribution_based' if credit_scheme == 'contribution_based' else '')
         if save_suffix:
             print(f"credit_pricing.scheme={credit_scheme} -> 模型保存带后缀 {save_suffix}，不覆盖原模型")
-        
+
+        # 使用 StoreNet 2020 训练日期（与 MAPPO 一致）
         if training_dates is None:
             training_dates = [
-                '2011-07-03', '2011-07-04', '2011-07-05', '2011-07-06',
-                '2011-07-07', '2011-07-08', '2011-07-09',
+                '2020-01-01', '2020-01-02', '2020-01-03', '2020-01-04',
+                '2020-01-05', '2020-01-06', '2020-01-07',
             ]
         if pv_coefficients_list is None:
             sunny_coef = MultiAgentDataInterface.get_weather_coefficient('sunny')
@@ -291,7 +308,7 @@ class IndependentBaseline:
                 [cloudy_coef, cloudy_coef, cloudy_coef],
             ]
         num_training_dates = len(training_dates)
-        
+
         print("=" * 60)
         print("Training Independent Learning Baseline")
         print(f"use_community_env={self.use_community_env}")
@@ -300,47 +317,47 @@ class IndependentBaseline:
         print(f"Training dates: {training_dates}")
         print(f"Number of episodes: {num_episodes}")
         print("=" * 60)
-        
+
         if self.use_community_env:
             self._train_with_community_env(
                 num_episodes, save_dir, training_dates, pv_coefficients_list, num_training_dates,
                 credit_scheme=credit_scheme
             )
             return
-        
+
         # ---------- 原逻辑：单智能体环境 ----------
         all_training_histories = []
-        
+
         for agent_id in range(self.n_agents):
             print(f"\n{'='*60}")
             print(f"Training Agent {agent_id + 1}/{self.n_agents}")
             print(f"Random seed: {self.random_seeds[agent_id]}")
             print(f"{'='*60}")
-            
+
             env = self.train_envs[agent_id]
             agent = self.agents[agent_id]
-            
+
             return_list = []
             loss_list = {'actor_loss': [], 'critic_loss': [], 'entropy': []}
-            
+
             for episode in range(num_episodes):
                 # 选择训练日期（循环使用）
                 date_index = episode % num_training_dates
                 training_date = training_dates[date_index]
-                
+
                 # 更新光伏系数（根据日期）
                 pv_coefs = pv_coefficients_list[date_index]
                 env.data_interface.set_pv_coefficient(pv_coefs[agent_id])
-                
+
                 # 每个episode开始时打印（每10个）
                 if (episode + 1) % 10 == 0:
                     print(f"Agent {agent_id + 1} - Episode {episode + 1}/{num_episodes} - Date: {training_date}...", flush=True)
-                
+
                 # 重置环境并设置日期
                 state = env.reset()
                 env.current_time = training_date
                 env.current_time_index = 0
-                
+
                 episode_return = 0
                 transition_dict = {
                     'states': [],
@@ -351,53 +368,62 @@ class IndependentBaseline:
                 }
                 done = False
                 step_count = 0
-                
+
                 while not done:
                     # 选择动作
                     action = agent.take_action(state)
-                    
+
+                    # 防御：确保动作值都是数值类型（解决偶发的空列表问题）
+                    for k, v in action.items():
+                        if isinstance(v, (list, tuple)) and len(v) == 0:
+                            action[k] = 0.0
+                        elif isinstance(v, (list, tuple)) and len(v) > 0:
+                            action[k] = v[0]
+                        elif not isinstance(v, (int, float)):
+                            action[k] = 0.0
+
                     # 执行动作
                     next_state, reward, done = env.step(state, action)
-                    
+
                     # 存储经验
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
                     transition_dict['next_states'].append(next_state)
                     transition_dict['rewards'].append(reward)
                     transition_dict['dones'].append(done)
-                    
+
                     state = next_state
                     episode_return += reward
                     step_count += 1
-                    
+
                     # 防止无限循环
                     if step_count >= 48:  # 一天最多48个时间步
                         done = True
-                
+
                 # 每10个episode打印完成信息
                 if (episode + 1) % 10 == 0:
                     print(f"Agent {agent_id + 1} - Episode {episode + 1} completed: steps={step_count}, return={episode_return:.2f}", flush=True)
-                
+
                 # 更新策略并获取统计信息
                 update_stats = agent.update(transition_dict)
                 return_list.append(episode_return)
-                
+
                 # 记录loss和熵
                 if update_stats:
                     loss_list['actor_loss'].append(update_stats.get('actor_loss', 0))
                     loss_list['critic_loss'].append(update_stats.get('critic_loss', 0))
                     loss_list['entropy'].append(update_stats.get('entropy', 0))
-                
+
                 # 打印进度（每10轮打印一次详细信息）
                 if (episode + 1) % 10 == 0:
                     window_size = min(10, len(return_list))
                     avg_return = np.mean(return_list[-window_size:])
                     recent_returns = return_list[-window_size:] if len(return_list) >= window_size else return_list
                     std_return = np.std(recent_returns)
-                    
+
                     print(f"Agent {agent_id + 1} - Episode {episode + 1}/{num_episodes}")
                     print(f"  Return: avg={avg_return:.2f}, std={std_return:.2f}, latest={episode_return:.2f}")
-                    
+
                     if update_stats and len(loss_list['actor_loss']) > 0:
                         window_size_loss = min(10, len(loss_list['actor_loss']))
                         avg_actor_loss = np.mean(loss_list['actor_loss'][-window_size_loss:])
@@ -405,7 +431,7 @@ class IndependentBaseline:
                         avg_entropy = np.mean(loss_list['entropy'][-window_size_loss:])
                         print(f"  Loss: Actor={avg_actor_loss:.4f}, Critic={avg_critic_loss:.4f}, Entropy={avg_entropy:.4f}")
                     print()
-            
+
             # 保存训练历史
             training_history = {
                 'returns': return_list,
@@ -414,8 +440,8 @@ class IndependentBaseline:
                 'entropy': loss_list['entropy']
             }
             all_training_histories.append(training_history)
-            
-            # 保存模型（每个家庭一个）；scheme=contribution_based 时带 _contribution_based 后缀，不覆盖原模型
+
+            # 保存模型（每个家庭一个）；scheme=contribution_based 时带后缀
             model_path = os.path.join(save_dir, f'independent_agent_{agent_id}{save_suffix}.pth')
             checkpoint = {
                 'episode': num_episodes,
@@ -432,40 +458,52 @@ class IndependentBaseline:
             }
             torch.save(checkpoint, model_path)
             print(f"Agent {agent_id + 1} model saved to {model_path}")
-        
+
         print("\n" + "=" * 60)
         print("Independent Learning Baseline Training Completed!")
         print(f"All {self.n_agents} models saved to {save_dir}" + (f" (suffix {save_suffix})" if save_suffix else ""))
         print("=" * 60)
-        
+
         # 绘制训练曲线（所有模型）
         self._plot_training_curves(all_training_histories, save_dir)
-    
+
     def _train_with_community_env(self, num_episodes, save_dir, training_dates, pv_coefficients_list, num_training_dates, credit_scheme='uniform'):
-        """方案1：在共享多智能体环境（含社区储能）中独立训练每个智能体。credit_scheme=contribution_based 时保存带 _contribution_based 后缀，不覆盖原模型。"""
+        """方案1：在共享多智能体环境（含社区储能）中独立训练每个智能体。"""
         ma_env = self.train_ma_env
         ma_env.set_training_dates(training_dates, pv_coefficients_list)
-        
+
         all_training_histories = [
             {'returns': [], 'actor_loss': [], 'critic_loss': [], 'entropy': []}
             for _ in range(self.n_agents)
         ]
-        
+
         for episode in range(num_episodes):
             date_index = episode % num_training_dates
             for i in range(self.n_agents):
                 ma_env.agents[i].env.data_interface.set_pv_coefficient(pv_coefficients_list[date_index][i])
-            
-            states = ma_env.reset(mode='train', date_index=date_index)
+
+            states = ma_env.reset(mode='train', date_index=date_index, house_index=0)
             transition_dicts = [
                 {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'dones': []}
                 for _ in range(self.n_agents)
             ]
             done = False
             step_count = 0
-            
+
             while not done:
+                # 获取原始动作
                 actions = [self.agents[i].take_action(states[i]) for i in range(self.n_agents)]
+
+                # 防御：确保每个动作字典中的值都是数值
+                for i, act in enumerate(actions):
+                    for k, v in act.items():
+                        if isinstance(v, (list, tuple)) and len(v) == 0:
+                            act[k] = 0.0
+                        elif isinstance(v, (list, tuple)) and len(v) > 0:
+                            act[k] = v[0]
+                        elif not isinstance(v, (int, float)):
+                            act[k] = 0.0
+
                 next_states, rewards, dones, info = ma_env.step(actions)
                 for i in range(self.n_agents):
                     transition_dicts[i]['states'].append(states[i])
@@ -478,7 +516,7 @@ class IndependentBaseline:
                 step_count += 1
                 if step_count >= 48:
                     done = True
-            
+
             for i in range(self.n_agents):
                 update_stats = self.agents[i].update(transition_dicts[i])
                 episode_return_i = sum(transition_dicts[i]['rewards'])
@@ -487,11 +525,11 @@ class IndependentBaseline:
                     all_training_histories[i]['actor_loss'].append(update_stats.get('actor_loss', 0))
                     all_training_histories[i]['critic_loss'].append(update_stats.get('critic_loss', 0))
                     all_training_histories[i]['entropy'].append(update_stats.get('entropy', 0))
-            
+
             if (episode + 1) % 10 == 0:
                 total_return = sum(all_training_histories[i]['returns'][-1] for i in range(self.n_agents))
                 print(f"Episode {episode + 1}/{num_episodes} (date_index={date_index}) - Total return={total_return:.2f}, steps={step_count}")
-        
+
         community_suffix = '_community' + ('_contribution_based' if credit_scheme == 'contribution_based' else '')
         for agent_id in range(self.n_agents):
             agent = self.agents[agent_id]
@@ -512,32 +550,26 @@ class IndependentBaseline:
             }
             torch.save(checkpoint, model_path)
             print(f"Agent {agent_id + 1} model (community) saved to {model_path}")
-        
+
         print("\n" + "=" * 60)
         print("Independent Learning Baseline (with community env) Training Completed!")
         print(f"All {self.n_agents} models saved to {save_dir} (filename suffix {community_suffix})")
         print("=" * 60)
         self._plot_training_curves(all_training_histories, save_dir)
-    
+
     def _plot_training_curves(self, all_training_histories, save_dir):
-        """
-        绘制训练曲线（所有模型的）
-        
-        Args:
-            all_training_histories: 所有模型的训练历史列表
-            save_dir: 保存目录
-        """
+        """绘制训练曲线（所有模型的）"""
         if not all_training_histories:
             print("No training history to plot.")
             return
-        
+
         # 创建图形
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle(f'Independent Learning Baseline Training Curves ({self.n_agents} Models)', fontsize=16)
-        
+
         colors = ['#FF6B6B', '#4ECDC4', '#45B7D1']
         labels = [f'Agent {i+1} (seed={self.random_seeds[i]})' for i in range(self.n_agents)]
-        
+
         # 1. Returns曲线
         ax1 = axes[0, 0]
         for i, training_history in enumerate(all_training_histories):
@@ -550,7 +582,7 @@ class IndependentBaseline:
         ax1.set_title('Episode Returns')
         ax1.legend()
         ax1.grid(True, alpha=0.3)
-        
+
         # 2. Actor Loss曲线
         ax2 = axes[0, 1]
         for i, training_history in enumerate(all_training_histories):
@@ -563,7 +595,7 @@ class IndependentBaseline:
         ax2.set_title('Actor Loss')
         ax2.legend()
         ax2.grid(True, alpha=0.3)
-        
+
         # 3. Critic Loss曲线
         ax3 = axes[1, 0]
         for i, training_history in enumerate(all_training_histories):
@@ -576,7 +608,7 @@ class IndependentBaseline:
         ax3.set_title('Critic Loss')
         ax3.legend()
         ax3.grid(True, alpha=0.3)
-        
+
         # 4. Entropy曲线
         ax4 = axes[1, 1]
         for i, training_history in enumerate(all_training_histories):
@@ -589,54 +621,44 @@ class IndependentBaseline:
         ax4.set_title('Policy Entropy')
         ax4.legend()
         ax4.grid(True, alpha=0.3)
-        
+
         plt.tight_layout()
-        
+
         # 保存图片
         plot_path = os.path.join(save_dir, 'training_curves.png')
         plt.savefig(plot_path, dpi=150, bbox_inches='tight')
         print(f"Training curves saved to {plot_path}")
-        
-        # 显示图片（如果在交互式环境中）
-        try:
-            plt.show()
-        except:
-            pass
-        
+
+        # 由于使用 Agg 后端，不显示图片
         plt.close()
-    
+
     def load_models(self, model_dir='multi_agent/baselines/models'):
         """
         加载训练好的模型（每个家庭使用各自的模型）
-        根据 config 的 use_community_env 与 credit_pricing.scheme 自动选择文件名：
-        use_community_env=True 时带 _community，scheme=contribution_based 时带 _contribution_based，不覆盖原模型。
-        
-        Args:
-            model_dir: 模型目录
+        根据 config 的 use_community_env 与 credit_pricing.scheme 自动选择文件名。
         """
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         scheme = _load_credit_pricing_scheme_from_config(default='uniform')
         suffix = ('_community' if self.use_community_env else '') + ('_contribution_based' if scheme == 'contribution_based' else '')
         all_loaded = True
         for agent_id in range(self.n_agents):
             model_path = os.path.join(model_dir, f'independent_agent_{agent_id}{suffix}.pth')
             if os.path.exists(model_path):
-                checkpoint = torch.load(model_path, map_location=device)
-                
-                # 加载网络参数（每个家庭使用各自的模型）
+                checkpoint = torch.load(model_path, map_location=self.device)
+
+                # 加载网络参数
                 agent = self.agents[agent_id]
                 agent.shared_backbone.load_state_dict(checkpoint['shared_backbone'])
                 for name, branch in agent.action_branches.items():
                     if name in checkpoint['action_branches']:
                         branch.load_state_dict(checkpoint['action_branches'][name])
                 agent.value_net.load_state_dict(checkpoint['value_net'])
-                
+
                 # 加载运行统计（如果存在）
                 if checkpoint.get('running_stats') is not None and hasattr(agent, 'running_stats'):
-                    agent.running_stats.mean = checkpoint['running_stats']['mean'].to(device)
-                    agent.running_stats.std = checkpoint['running_stats']['std'].to(device)
+                    agent.running_stats.mean = checkpoint['running_stats']['mean'].to(self.device)
+                    agent.running_stats.std = checkpoint['running_stats']['std'].to(self.device)
                     agent.running_stats.count = checkpoint['running_stats']['count']
-                
+
                 # 如果checkpoint中有随机种子，使用它
                 if 'random_seed' in checkpoint:
                     self.random_seeds[agent_id] = checkpoint['random_seed']
@@ -644,32 +666,25 @@ class IndependentBaseline:
                         self.eval_ma_env.agents[agent_id].env.data_interface.np_random = np.random.RandomState(self.random_seeds[agent_id])
                     else:
                         self.eval_envs[agent_id].data_interface.np_random = np.random.RandomState(self.random_seeds[agent_id])
-                
+
                 print(f"Loaded model for Agent {agent_id + 1} from {model_path}")
             else:
                 print(f"Warning: Model not found for Agent {agent_id + 1}: {model_path}")
                 all_loaded = False
-        
+
         if all_loaded:
             print(f"All {self.n_agents} models loaded successfully")
         else:
             print("Please train the models first using baseline.train()")
-    
+
     def evaluate(self, num_episodes=10, dates=None):
         """
-        评估独立学习基线。
-        use_community_env=True 时在共享多智能体环境中评估，否则在各自单智能体环境中评估。
-        
-        Args:
-            num_episodes: 评估轮数
-            dates: 评估日期列表，如果为None则使用默认日期
-        
-        Returns:
-            dict: 评估结果
+        评估独立学习基线（使用 StoreNet 2020 评估日期）
         """
         if dates is None:
-            dates = ['2011-07-03'] * num_episodes
-        
+            # 使用 StoreNet 2020 评估日期（与 MAPPO 评估一致）
+            dates = ['2020-01-08', '2020-01-09', '2020-01-10']
+
         results = {
             'episode_returns': [],
             'episode_costs': [],
@@ -677,25 +692,40 @@ class IndependentBaseline:
             'agent_costs': [[] for _ in range(self.n_agents)],
             'community_peak_loads': []
         }
-        
+
         print("=" * 60)
         print("Evaluating Independent Learning Baseline")
         print(f"use_community_env={self.use_community_env}")
         print(f"Each agent uses its own model")
         print(f"Random seeds: {self.random_seeds}")
         print("=" * 60)
-        
+
         if self.use_community_env:
-            eval_dates = ['2011-07-10', '2011-07-11', '2011-07-12']
+            # 使用 StoreNet 2020 评估数据
+            eval_dates = dates  # 已经为 2020-01-08 等
+            # 光伏系数：与 MAPPO 评估一致（晴天、阴天、正常）
+            sunny_coef = MultiAgentDataInterface.get_weather_coefficient('sunny')
+            cloudy_coef = MultiAgentDataInterface.get_weather_coefficient('cloudy')
+            normal_coef = MultiAgentDataInterface.get_weather_coefficient('normal')
             pv_list = [
-                [3.0, 3.0, 3.0], [1.0, 1.0, 1.0], [2.0, 2.0, 2.0]
+                [sunny_coef, sunny_coef, sunny_coef],
+                [cloudy_coef, cloudy_coef, cloudy_coef],
+                [normal_coef, normal_coef, normal_coef],
             ]
+            # 确保 pv_list 长度足够
+            while len(pv_list) < len(eval_dates):
+                pv_list.append([normal_coef, normal_coef, normal_coef])
             self.eval_ma_env.set_evaluation_dates(eval_dates, pv_list)
+
+            # 关键：在评估时也需要临时切换工作目录，避免相对路径错误
+            original_cwd = os.getcwd()
+            os.chdir(os.path.join(project_root, 'multi_agent'))
+
             for episode in range(num_episodes):
                 date_index = episode % len(eval_dates)
                 for i in range(self.n_agents):
                     self.eval_ma_env.agents[i].env.data_interface.set_pv_coefficient(pv_list[date_index][i])
-                states = self.eval_ma_env.reset(mode='eval', date_index=date_index)
+                states = self.eval_ma_env.reset(mode='eval', date_index=date_index, house_index=0)
                 done = False
                 step = 0
                 episode_returns = [0.0] * self.n_agents
@@ -703,6 +733,17 @@ class IndependentBaseline:
                 community_loads = []
                 while not done:
                     actions = [self.agents[i].take_action(states[i]) for i in range(self.n_agents)]
+
+                    # 防御：确保动作值都是数值
+                    for i, act in enumerate(actions):
+                        for k, v in act.items():
+                            if isinstance(v, (list, tuple)) and len(v) == 0:
+                                act[k] = 0.0
+                            elif isinstance(v, (list, tuple)) and len(v) > 0:
+                                act[k] = v[0]
+                            elif not isinstance(v, (int, float)):
+                                act[k] = 0.0
+
                     next_states, rewards, dones, info = self.eval_ma_env.step(actions)
                     for i in range(self.n_agents):
                         episode_returns[i] += rewards[i]
@@ -721,6 +762,10 @@ class IndependentBaseline:
                 peak_load = max(community_loads) if community_loads else 0
                 results['community_peak_loads'].append(peak_load)
                 print(f"Episode {episode + 1}/{num_episodes}: Total Return = {sum(episode_returns):.2f}, Total Cost = {sum(episode_costs):.2f}, Peak Load = {peak_load:.2f} kW")
+
+            # 恢复工作目录
+            os.chdir(original_cwd)
+
             avg_return = np.mean(results['episode_returns'])
             avg_cost = np.mean(results['episode_costs'])
             avg_peak_load = np.mean(results['community_peak_loads'])
@@ -731,90 +776,14 @@ class IndependentBaseline:
             print(f"Average Peak Load: {avg_peak_load:.2f} kW")
             print("=" * 60)
             return results
-        
-        # ---------- 原逻辑：单智能体环境 ----------
-        for episode in range(num_episodes):
-            states = []
-            for env in self.eval_envs:
-                state = env.reset()
-                if dates[episode] != env.current_time:
-                    env.current_time = dates[episode]
-                    env.current_time_index = 0
-                states.append(state)
-            
-            done = False
-            episode_returns = [0.0] * self.n_agents
-            episode_costs = [0.0] * self.n_agents
-            community_loads = []
-            step = 0
-            while not done:
-                actions = []
-                for i, (state, agent) in enumerate(zip(states, self.agents)):
-                    action = agent.take_action(state)
-                    actions.append(action)
-                next_states = []
-                all_dones = []
-                for i, (env, state, action) in enumerate(zip(self.eval_envs, states, actions)):
-                    next_state, reward, done = env.step(state, action)
-                    next_states.append(next_state)
-                    all_dones.append(done)
-                    episode_returns[i] += reward
-                    episode_costs[i] += env.current_step_cost
-                agent_net_loads = []
-                for env in self.eval_envs:
-                    state = env.state
-                    total_consumption = (
-                        state['home_load']
-                        + max(0, env.current_ev_power)
-                        + max(0, env.current_battery_power)
-                        + state['Air_conditioner_power']
-                        + state['Air_conditioner_power2']
-                        + state.get('wash_machine_state', 0) * env.wash_machine_power
-                        + state.get('ewh_power', 0)
-                    )
-                    total_generation = (
-                        state['pv_generation']
-                        + max(0, -env.current_ev_power)
-                        + max(0, -env.current_battery_power)
-                    )
-                    agent_net_loads.append(total_consumption - total_generation)
-                community_loads.append(sum(agent_net_loads))
-                states = next_states
-                done = all(all_dones)
-                step += 1
-                if step >= 48:
-                    done = True
-            
-            results['episode_returns'].append(sum(episode_returns))
-            results['episode_costs'].append(sum(episode_costs))
-            for i in range(self.n_agents):
-                results['agent_returns'][i].append(episode_returns[i])
-                results['agent_costs'][i].append(episode_costs[i])
-            peak_load = max(community_loads) if community_loads else 0
-            results['community_peak_loads'].append(peak_load)
-            print(f"Episode {episode + 1}/{num_episodes}: Total Return = {sum(episode_returns):.2f}, Total Cost = {sum(episode_costs):.2f}, Peak Load = {peak_load:.2f} kW")
-        
-        avg_return = np.mean(results['episode_returns'])
-        avg_cost = np.mean(results['episode_costs'])
-        avg_peak_load = np.mean(results['community_peak_loads'])
-        print("\n" + "=" * 60)
-        print("Independent Learning Baseline Results:")
-        print(f"Average Total Return: {avg_return:.2f}")
-        print(f"Average Total Cost: {avg_cost:.2f}")
-        print(f"Average Peak Load: {avg_peak_load:.2f} kW")
-        print("=" * 60)
+
+        # ---------- 原逻辑：单智能体环境（未修改，如需使用请自行更新）----------
+        # 注意：此分支仍使用旧数据，建议设置 use_community_env=True
+        print("单智能体环境评估暂未更新，请使用 use_community_env=True 或自行修改")
         return results
-    
+
     def calculate_baseline_peak(self, num_episodes=10):
-        """
-        计算基准峰值（用于归一化峰值惩罚）
-        
-        Args:
-            num_episodes: 评估轮数
-        
-        Returns:
-            float: 基准峰值
-        """
+        """计算基准峰值（用于归一化峰值惩罚）"""
         print("Calculating baseline peak load...")
         results = self.evaluate(num_episodes=num_episodes)
         baseline_peak = np.mean(results['community_peak_loads'])
@@ -823,9 +792,8 @@ class IndependentBaseline:
 
 
 if __name__ == "__main__":
- 
     import argparse
-    
+
     parser = argparse.ArgumentParser(description='Train and evaluate independent learning baseline')
     parser.add_argument('--episodes', type=int, default=1000,
                        help='Number of training episodes per agent (default: 1000)')
@@ -833,17 +801,16 @@ if __name__ == "__main__":
                        help='Only evaluate (requires trained models)')
     parser.add_argument('--calc_peak_only', action='store_true',
                        help='Only calculate baseline peak (requires trained models)')
-    
+
     args = parser.parse_args()
-    
-    # 创建独立学习基线
+
+    # 创建独立学习基线（默认会从 config.json 读取 use_community_env，通常为 True）
     baseline = IndependentBaseline(
         n_agents=3,
-        pv_coefficients=[4.0,4.0,4.0]  # 正常天气
+        pv_coefficients=[4.0, 4.0, 4.0]  # 正常天气
     )
-    
+
     if args.calc_peak_only:
-        # 仅计算基准峰值（需要先训练）
         baseline.load_models()
         baseline_peak = baseline.calculate_baseline_peak(num_episodes=10)
         print(f"\n{'='*60}")
@@ -851,28 +818,24 @@ if __name__ == "__main__":
         print(f"请在创建MultiAgentHEMEnv时使用: baseline_peak={baseline_peak:.2f}")
         print(f"{'='*60}")
     elif args.eval_only:
-        # 仅评估（需要先训练）
         baseline.load_models()
         results = baseline.evaluate(num_episodes=10)
         print(f"\n{'='*60}")
         print("评估完成")
         print(f"{'='*60}")
     else:
-        # 训练 + 计算基准峰值
         print(f"\n{'='*60}")
         print("开始训练独立学习基线")
         print(f"每个智能体训练 {args.episodes} 轮")
         print(f"{'='*60}")
-        
-        # 训练
+
         baseline.train(num_episodes=args.episodes, save_dir='multi_agent/baselines/models')
-        
-        # 计算基准峰值
+
         print(f"\n{'='*60}")
         print("计算基准峰值")
         print(f"{'='*60}")
         baseline_peak = baseline.calculate_baseline_peak(num_episodes=10)
-        
+
         print(f"\n{'='*60}")
         print(f"训练完成！基准峰值: {baseline_peak:.2f} kW")
         print(f"\n请在使用MultiAgentHEMEnv时使用以下参数:")

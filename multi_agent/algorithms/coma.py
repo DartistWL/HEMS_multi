@@ -1,8 +1,5 @@
 """
-COMA: Counterfactual Multi-Agent Policy Gradients（改进版）
-- 状态归一化、奖励缩放
-- 解析反事实基线（对每维动作求期望）、advantage 归一化、梯度裁剪
-- Critic 学习率低于 Actor
+COMA: Counterfactual Multi-Agent Policy Gradients (GPU ready)
 """
 import torch
 import torch.nn as nn
@@ -21,8 +18,6 @@ from multi_agent.algorithms.mappo import PopArtNormalizer
 
 
 class COMAActor(nn.Module):
-    """与 MAPPO 一致的因子化 Actor：共享骨干 + 每维度一个分支。"""
-
     def __init__(self, state_dim, hidden_dim, action_space_config):
         super(COMAActor, self).__init__()
         self.action_space_config = action_space_config
@@ -49,8 +44,6 @@ class COMAActor(nn.Module):
 
 
 class COMACritic(nn.Module):
-    """集中式 Critic：输入全局状态 + 联合动作 one-hot -> Q(s,u)。支持 Pop-Art 时最后一层单独以便调整权重。"""
-
     def __init__(self, global_state_dim, joint_action_onehot_dim, hidden_dim=128):
         super(COMACritic, self).__init__()
         input_dim = global_state_dim + joint_action_onehot_dim
@@ -69,75 +62,102 @@ class COMACritic(nn.Module):
 
 
 def batch_joint_action_indices_to_onehot(indices_batch, dim_sizes, device):
-    """(T, 3, 7) -> (T, 135)."""
     n_agents = 3
-    dim_sizes = list(dim_sizes)
-    total_dim = sum(dim_sizes) * n_agents
+    dim_sizes = torch.tensor(dim_sizes, device=device)
+    total_dim = (dim_sizes.sum() * n_agents).item()
     T = len(indices_batch)
-    out = np.zeros((T, total_dim), dtype=np.float32)
+    out = torch.zeros((T, total_dim), device=device, dtype=torch.float32)
     for t in range(T):
         offset = 0
         for i in range(n_agents):
             idx = indices_batch[t][i]
             for d, size in enumerate(dim_sizes):
-                aid = int(idx[d]) if hasattr(idx[d], '__int__') else idx[d]
-                aid = min(max(0, aid), size - 1)
+                try:
+                    val = idx[d]
+                    if isinstance(val, enumerate):
+                        val = 0
+                    aid = int(val)
+                except (TypeError, ValueError):
+                    aid = 0
+                aid = max(0, min(aid, size.item() - 1))
                 out[t, offset + aid] = 1.0
-                offset += size
-    return torch.FloatTensor(out).to(device)
+                offset += size.item()
+    return out
 
 
 def build_onehot_vary_agent_dim(indices_batch, agent_i, dim_d, dim_sizes, device):
-    """
-    构建 batch：仅 agent_i 的第 dim_d 维在 0..dim_sizes[dim_d]-1 上变化，用于解析反事实基线。
-    """
+    if not isinstance(dim_sizes, (list, tuple, torch.Tensor)):
+        dim_sizes = [dim_sizes]
+    dim_sizes = torch.tensor(dim_sizes, device=device)
     n_agents = 3
-    dim_sizes = list(dim_sizes)
-    n_ad = dim_sizes[dim_d]
+    n_ad = dim_sizes[dim_d].item()
     T = len(indices_batch)
-    total_dim = sum(dim_sizes) * n_agents
-    out = np.zeros((T * n_ad, total_dim), dtype=np.float32)
+    total_dim = (dim_sizes.sum() * n_agents).item()
+    out = torch.zeros((T * n_ad, total_dim), device=device, dtype=torch.float32)
+
     for t in range(T):
-        base = [list(indices_batch[t][j]) for j in range(n_agents)]
+        base = []
+        for j in range(n_agents):
+            idx_j = indices_batch[t][j]
+            if isinstance(idx_j, enumerate):
+                idx_j = list(idx_j)
+            if not isinstance(idx_j, (list, tuple)):
+                idx_j = [idx_j]
+            base.append([int(x) if isinstance(x, (int, float)) else 0 for x in idx_j])
+
         for a in range(n_ad):
-            row = [list(base[j]) for j in range(n_agents)]
+            row = [base[j][:] for j in range(n_agents)]
             row[agent_i][dim_d] = a
             offset = 0
             for i in range(n_agents):
-                for d, size in enumerate(dim_sizes):
-                    aid = min(max(0, int(row[i][d])), size - 1)
+                for d_idx, size in enumerate(dim_sizes):
+                    val = row[i][d_idx]
+                    if isinstance(val, enumerate):
+                        val = 0
+                    try:
+                        aid = int(val)
+                    except (TypeError, ValueError):
+                        aid = 0
+                    aid = max(0, min(aid, size.item() - 1))
                     out[t * n_ad + a, offset + aid] = 1.0
-                    offset += size
-    return torch.FloatTensor(out).to(device)
+                    offset += size.item()
+    return out
 
 
 class COMA:
-    """
-    COMA 改进版：状态归一化、奖励缩放、解析反事实基线、advantage 归一化、梯度裁剪。
-    """
-
     def __init__(self, env, n_agents=3, hidden_dim=128, gamma=0.96,
                  lr_actor=3e-4, lr_critic=5e-5,
                  use_actor_state_normalization=False, use_critic_state_normalization=True,
                  reward_scale=10.0, use_reward_normalization=False,
                  max_grad_norm=10.0, td_target_clip=200.0, ent_coef=0.01, n_actor_epochs=2,
                  use_popart=True, use_advantage_normalization=True, device=None):
+        # 设备设置
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
+        print(f"COMA using device: {self.device}")
+
         self.env = env
         self.n_agents = n_agents
         self.gamma = gamma
         self.max_grad_norm = max_grad_norm
-        self.td_target_clip = td_target_clip  # 裁剪 TD target，避免单次极差 episode 导致 critic 大更新、loss 尖峰
-        self.ent_coef = ent_coef  # 熵系数，鼓励探索（与 MAPPO 一致）
-        self.n_actor_epochs = max(1, n_actor_epochs)  # Actor 每批数据重复更新次数，降低方差
-        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.td_target_clip = td_target_clip
+        self.ent_coef = ent_coef
+        self.n_actor_epochs = max(1, n_actor_epochs)
 
         self.action_space_config = get_action_space_config(env)
         self.dim_sizes = get_dim_sizes(self.action_space_config)
+        if not isinstance(self.dim_sizes, (list, tuple)):
+            self.dim_sizes = [self.dim_sizes]
+        else:
+            self.dim_sizes = list(self.dim_sizes)
+        self.dim_sizes = [int(x) if isinstance(x, (int, float)) else 0 for x in self.dim_sizes]
+        if len(self.dim_sizes) == 0 or any(d <= 0 for d in self.dim_sizes):
+            raise ValueError(f"Invalid dim_sizes: {self.dim_sizes}")
         self.joint_action_onehot_dim = sum(self.dim_sizes) * n_agents
 
-        sample_states = env.reset(mode='train', date_index=0)
+        sample_states = env.reset(mode='train', date_index=0, house_index=0)
         self.local_state_dim = len(state_dict_to_vector(sample_states[0]))
-        # Critic 输入与 MAPPO 一致：concat(各 agent 的 local state)，不再用 env 的 global_state
         self.critic_global_dim = self.local_state_dim * n_agents
 
         self.actors = nn.ModuleList([
@@ -171,7 +191,6 @@ class COMA:
             self.popart_normalizer = None
 
         self.use_advantage_normalization = use_advantage_normalization
-
         self.reset_buffer()
 
     def _state_to_vector(self, state_dict):
@@ -210,7 +229,6 @@ class COMA:
             ad, idx = {}, []
             for k in keys:
                 logits = logits_dict[k]
-                # 防止 logits 过大导致 softmax 溢出产生 nan/inf
                 logits = torch.clamp(logits, -20.0, 20.0)
                 probs = F.softmax(logits, dim=-1)
                 if not torch.isfinite(probs).all() or (probs < 0).any():
@@ -223,7 +241,7 @@ class COMA:
         return actions_dict, action_indices
 
     def store_transition(self, local_states, global_state, action_indices, rewards,
-                        next_local_states, next_global_state, dones):
+                         next_local_states, next_global_state, dones):
         ls = self._get_local_vectors(local_states)
         nls = self._get_local_vectors(next_local_states)
         team_r = sum(rewards)
@@ -245,20 +263,40 @@ class COMA:
         else:
             ls_for_critic = ls
             nls_for_critic = nls
-        # Critic 输入 = concat(各 agent 的 local state)，与 MAPPO 一致
         global_for_critic = np.ravel(ls_for_critic).astype(np.float32)
         next_global_for_critic = np.ravel(nls_for_critic).astype(np.float32)
         self.buffer['local_states'].append(ls_for_actor)
         self.buffer['global_states'].append(global_for_critic)
-        self.buffer['joint_action_indices'].append([list(a) for a in action_indices])
+        cleaned_indices = []
+        for a in action_indices:
+            if isinstance(a, enumerate):
+                a = list(a)
+            if not isinstance(a, (list, tuple)):
+                a = [a]
+            clean_a = []
+            for val in a:
+                if isinstance(val, enumerate):
+                    val = 0
+                try:
+                    clean_a.append(int(val))
+                except (TypeError, ValueError):
+                    clean_a.append(0)
+            cleaned_indices.append(clean_a)
+        self.buffer['joint_action_indices'].append(cleaned_indices)
         self.buffer['rewards'].append(scaled_r)
         self.buffer['next_local_states'].append(nls_for_actor)
         self.buffer['next_global_states'].append(next_global_for_critic)
         self.buffer['dones'].append(all(dones))
 
     def update(self):
+        for key in ['rewards', 'global_states', 'next_global_states']:
+            arr = np.array(self.buffer[key])
+            if not np.isfinite(arr).all():
+                self.reset_buffer()
+                return None
         if len(self.buffer['rewards']) == 0:
             return None
+
         T = len(self.buffer['rewards'])
         global_states = np.array(self.buffer['global_states'])
         next_global_states = np.array(self.buffer['next_global_states'])
@@ -279,18 +317,16 @@ class COMA:
                 next_Q_raw = np.where(np.isfinite(next_Q_raw), next_Q_raw, 0.0)
                 if self.use_popart and self.popart_normalizer is not None:
                     next_Q_raw_t = torch.FloatTensor(next_Q_raw).to(self.device)
-                    next_Q_vals[:T - 1] = self.popart_normalizer.denormalize(next_Q_raw_t).cpu().numpy()
+                    next_Q_vals[:T-1] = self.popart_normalizer.denormalize(next_Q_raw_t).cpu().numpy()
                 else:
-                    next_Q_vals[:T - 1] = next_Q_raw
+                    next_Q_vals[:T-1] = next_Q_raw
         targets = torch.FloatTensor(
             rewards + self.gamma * (1.0 - dones.astype(np.float32)) * next_Q_vals
         ).to(self.device)
         targets = torch.where(torch.isfinite(targets), targets, torch.zeros_like(targets))
-        # 裁剪 TD target，避免单次极差 episode 导致 target 极大/极小、critic_loss 尖峰与策略震荡
         if self.td_target_clip is not None and self.td_target_clip > 0:
             targets = torch.clamp(targets, -self.td_target_clip, self.td_target_clip)
 
-        # Pop-Art：用当前 batch 的 target 更新统计，归一化 target；Critic 预测归一化后的 Q
         if self.use_popart and self.popart_normalizer is not None:
             updated = self.popart_normalizer.update(targets)
             if updated and self.popart_normalizer.old_mean is not None:
@@ -300,6 +336,7 @@ class COMA:
             targets_for_loss = targets
 
         Q = self.critic(gs, joint_onehot)
+        Q = torch.clamp(Q, -self.td_target_clip, self.td_target_clip)
         critic_loss = F.mse_loss(Q, targets_for_loss)
 
         baselines_per_agent = []
@@ -311,6 +348,7 @@ class COMA:
                     self.buffer['joint_action_indices'], i, d, self.dim_sizes, self.device)
                 gs_rep = gs.unsqueeze(1).expand(T, n_ad, -1).reshape(T * n_ad, -1)
                 Q_id = self.critic(gs_rep, onehot_batch).reshape(T, n_ad)
+                Q_id = torch.clamp(Q_id, -self.td_target_clip, self.td_target_clip)
                 if self.use_popart and self.popart_normalizer is not None:
                     Q_id = self.popart_normalizer.denormalize(Q_id)
                 local_i = np.array([self.buffer['local_states'][t][i] for t in range(T)])
@@ -322,9 +360,10 @@ class COMA:
                 baseline_i += (Q_id * probs_d).sum(dim=1)
             baselines_per_agent.append(baseline_i)
         baseline_avg = torch.stack(baselines_per_agent, dim=0).mean(dim=0)
-        # Advantage 用真实尺度 Q（Pop-Art 时需反归一化）
         Q_real = self.popart_normalizer.denormalize(Q) if (self.use_popart and self.popart_normalizer is not None) else Q
         advantages = (Q_real - baseline_avg).detach()
+        advantages = torch.nan_to_num(advantages, nan=0.0, posinf=1.0, neginf=-1.0)
+        advantages = torch.clamp(advantages, -10.0, 10.0)
         advantages = torch.where(torch.isfinite(advantages), advantages, torch.zeros_like(advantages))
         if self.use_advantage_normalization:
             adv_std = advantages.std()
@@ -355,7 +394,6 @@ class COMA:
                 actor_loss = actor_loss - self.ent_coef * entropy_t
         actor_loss = actor_loss / self.n_agents
 
-        # 若出现 nan 则跳过本次更新，避免污染参数（但仍返回真实 loss 便于日志诊断）
         if not torch.isfinite(critic_loss) or not torch.isfinite(actor_loss):
             return {
                 'actor_loss': float('nan') if not torch.isfinite(actor_loss) else actor_loss.item(),
@@ -367,7 +405,6 @@ class COMA:
         torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
         self.critic_optimizer.step()
 
-        # Actor 多 epoch 更新（同一批 advantage，用当前策略重算 log_prob 再 backward，类似 PPO）
         for _ in range(self.n_actor_epochs):
             actor_loss = 0.0
             for i in range(self.n_agents):
@@ -392,6 +429,8 @@ class COMA:
                     entropy_t = torch.stack(ent_list).mean()
                     actor_loss = actor_loss - self.ent_coef * entropy_t
             actor_loss = actor_loss / self.n_agents
+            if torch.isnan(actor_loss):
+                return {'actor_loss': float('nan'), 'critic_loss': critic_loss.item()}
             for j in range(self.n_agents):
                 self.actor_optimizers[j].zero_grad()
             actor_loss.backward()
@@ -443,3 +482,28 @@ class COMA:
                 self.popart_normalizer.running_mean = self.popart_normalizer.mean.clone()
                 self.popart_normalizer.running_std = self.popart_normalizer.std.clone()
                 self.popart_normalizer.running_count = pt.get('popart_running_count', 0)
+
+    def state_dict(self):
+        return {
+            'actors': [a.state_dict() for a in self.actors],
+            'critic': self.critic.state_dict(),
+            'actor_optimizers': [opt.state_dict() for opt in self.actor_optimizers],
+            'critic_optimizer': self.critic_optimizer.state_dict(),
+            'local_running_stats': self.local_running_stats.__dict__ if self.local_running_stats else None,
+            'reward_scaler': self.reward_scaler.__dict__,
+            'popart_normalizer': self.popart_normalizer.__dict__ if self.popart_normalizer else None,
+        }
+
+    def load_state_dict(self, state_dict):
+        for i, a in enumerate(self.actors):
+            a.load_state_dict(state_dict['actors'][i])
+        self.critic.load_state_dict(state_dict['critic'])
+        for i, opt in enumerate(self.actor_optimizers):
+            opt.load_state_dict(state_dict['actor_optimizers'][i])
+        self.critic_optimizer.load_state_dict(state_dict['critic_optimizer'])
+        if self.local_running_stats and state_dict['local_running_stats']:
+            self.local_running_stats.__dict__.update(state_dict['local_running_stats'])
+        if state_dict['reward_scaler']:
+            self.reward_scaler.__dict__.update(state_dict['reward_scaler'])
+        if self.popart_normalizer and state_dict['popart_normalizer']:
+            self.popart_normalizer.__dict__.update(state_dict['popart_normalizer'])

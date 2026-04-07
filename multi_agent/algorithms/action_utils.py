@@ -89,27 +89,60 @@ def indices_to_action_dicts(indices_list, action_space_config):
     return [indices_to_action_dict(idx, action_space_config) for idx in indices_list]
 
 
+# def state_dict_to_vector(state_dict):
+#     """
+#     将状态字典转为向量（与 MAPPO 的 _state_dict_to_vector 逻辑一致）。
+#     在边界处保证返回有限值，避免环境 state 中的 nan/inf 进入算法。
+#     """
+#     print(f"[DEBUG] state_dict type: {type(state_dict)}")
+#     if isinstance(state_dict, dict):
+#         print(f"[DEBUG] state_dict keys: {state_dict.keys()}")
+#         ordered_keys = sorted(state_dict.keys())
+#         print(f"[DEBUG] ordered_keys type: {type(ordered_keys)}, value: {ordered_keys}")
+#         if not ordered_keys:
+#             return np.array([], dtype=np.float32)
+#         first = state_dict[ordered_keys[0]]
+#         if isinstance(first, (list, np.ndarray)):
+#             vector = []
+#             for k in ordered_keys:
+#                 val = state_dict[k]
+#                 if isinstance(val, (list, np.ndarray)):
+#                     vector.extend(np.array(val).ravel().tolist())
+#                 else:
+#                     vector.append(float(val))
+#             out = np.array(vector, dtype=np.float32)
+#         else:
+#             out = np.array([float(state_dict[k]) for k in ordered_keys], dtype=np.float32)
+#         return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
+#     out = np.array(state_dict, dtype=np.float32)
+#     return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
 def state_dict_to_vector(state_dict):
     """
     将状态字典转为向量（与 MAPPO 的 _state_dict_to_vector 逻辑一致）。
     在边界处保证返回有限值，避免环境 state 中的 nan/inf 进入算法。
     """
     if isinstance(state_dict, dict):
-        ordered_keys = sorted(state_dict.keys())
+        # 强制转换为字符串列表（避免任何迭代器残留）
+        ordered_keys = list(sorted(state_dict.keys()))
+        # 同时确保每个元素都是字符串
+        ordered_keys = [str(k) for k in ordered_keys]
         if not ordered_keys:
             return np.array([], dtype=np.float32)
-        first = state_dict[ordered_keys[0]]
+        first = state_dict.get(ordered_keys[0])
         if isinstance(first, (list, np.ndarray)):
             vector = []
             for k in ordered_keys:
-                val = state_dict[k]
+                val = state_dict.get(k)
+                if val is None:
+                    val = 0.0
                 if isinstance(val, (list, np.ndarray)):
                     vector.extend(np.array(val).ravel().tolist())
                 else:
                     vector.append(float(val))
             out = np.array(vector, dtype=np.float32)
         else:
-            out = np.array([float(state_dict[k]) for k in ordered_keys], dtype=np.float32)
+            # 使用 get 避免 KeyError
+            out = np.array([float(state_dict.get(k, 0.0)) for k in ordered_keys], dtype=np.float32)
         return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
     out = np.array(state_dict, dtype=np.float32)
     return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
